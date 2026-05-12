@@ -84,11 +84,13 @@ function Home({ lang, setLang, go }) {
   const text = lang === 'zh' ? {
     title: 'DJJ 签字平台',
     sub: '请选择需要签署的文件类型',
+    delivery: '送货签收单', deliveryH: '司机签字 · 自动预填',
     dispatch: '发货报告', dispatchH: '司机签字 · 单页', rental: '叉车租赁协议', rentalH: '承租方签字 · 多页',
     device: isTablet ? 'iPad · 双栏视图' : 'iPhone · 单列视图',
   } : {
     title: 'DJJ Signing',
     sub: 'Choose the document you need to sign',
+    delivery: 'Delivery Order Sign-Off', deliveryH: 'Driver signature · prefilled',
     dispatch: 'Dispatch Report', dispatchH: 'Driver signature · 1 page', rental: 'Forklift Rental Agreement', rentalH: 'Lessee signature · multi-page',
     device: isTablet ? 'iPad · split layout' : 'iPhone · single-column',
   };
@@ -101,7 +103,7 @@ function Home({ lang, setLang, go }) {
       minHeight: 130, width: '100%',
     }}>
       <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 0.5 }}>
-        {k === 'dispatch' ? '01 · DISPATCH' : '02 · RENTAL'}
+        {k === 'delivery' ? '01 · DELIVERY' : k === 'dispatch' ? '02 · DISPATCH' : '03 · RENTAL'}
       </div>
       <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.2 }}>{title}</div>
       <div style={{ fontSize: 13, color: 'var(--muted)' }}>{hint}</div>
@@ -130,9 +132,10 @@ function Home({ lang, setLang, go }) {
             · {text.device}
           </div>
           <div style={{
-            display: 'grid', gridTemplateColumns: isTablet ? '1fr 1fr' : '1fr',
+            display: 'grid', gridTemplateColumns: isTablet ? 'repeat(3, 1fr)' : '1fr',
             gap: 14, marginTop: 22,
           }}>
+            <Card k="delivery" title={text.delivery} hint={text.deliveryH} />
             <Card k="dispatch" title={text.dispatch} hint={text.dispatchH} />
             <Card k="rental"   title={text.rental}   hint={text.rentalH} />
           </div>
@@ -213,8 +216,12 @@ window.SigningPDF = {
   async generate({ kind, data, sigImg, lang, filename }) {
     const t  = (en, zh) => lang === 'zh' ? zh : en;
     const tt = (en, zh) => lang === 'zh' ? `${zh} · ${en}` : `${en} · ${zh}`;
-    const docNo = kind === 'dispatch' ? (data.report_no || '') : (data.agreement_no || '');
-    const fname = filename || ((kind === 'dispatch' ? 'dispatch-report' : 'rental-agreement') +
+    const docNo = kind === 'delivery'
+      ? (data.invoice_no || '')
+      : kind === 'dispatch'
+        ? (data.report_no || '')
+        : (data.agreement_no || '');
+    const fname = filename || ((kind === 'delivery' ? 'delivery-order' : kind === 'dispatch' ? 'dispatch-report' : 'rental-agreement') +
       (docNo ? '-' + docNo.replace(/[^a-z0-9\-]/gi, '_') : '') + '.pdf');
 
     // Build print HTML — A4 width at 96dpi = 794px; we render at 800 for round numbers.
@@ -238,7 +245,47 @@ window.SigningPDF = {
       </section>`;
 
     let body = '';
-    if (kind === 'dispatch') {
+    if (kind === 'delivery') {
+      const items = Array.isArray(data.items) ? data.items : [];
+      const itemsHtml = items.length ? items.map((item, idx) => section(tt(`Item ${idx + 1}`, `货物 ${idx + 1}`), [
+        row(tt('Description', '描述'), item.description),
+        row(tt('Model', '型号'), item.model),
+        row(tt('VIN / Serial', 'VIN / 序列号'), item.serial || item.vin),
+        row(tt('Quantity', '数量'), item.quantity || item.qty),
+      ].join(''))).join('') : section(tt('Items', '货物明细'), [
+        row(tt('Description', '描述'), ''),
+        row(tt('Model', '型号'), ''),
+        row(tt('VIN / Serial', 'VIN / 序列号'), ''),
+        row(tt('Quantity', '数量'), ''),
+      ].join(''));
+
+      body += section(tt('Order Reference', '订单参考'), [
+        row(tt('Tax invoice #', '税务发票号'), data.invoice_no),
+        row(tt('Invoice date', '发票日期'), data.invoice_date),
+        row(tt('Sales rep', '销售代表'), data.sales_rep),
+        block(tt('Pick up location', '取货地点'), data.pickup_location),
+      ].join(''));
+      body += section(tt('Delivery Details', '送货信息'), [
+        row(tt('Customer name', '客户名称'), data.customer_name),
+        row(tt('Customer ABN', '客户 ABN'), data.customer_abn),
+        block(tt('Delivery address', '送货地址'), data.delivery_address),
+        row(tt('Contact name', '联系人'), data.delivery_contact),
+        row(tt('Contact phone', '联系电话'), data.delivery_phone),
+        row(tt('Contact email', '联系邮箱'), data.delivery_email),
+      ].join(''));
+      body += section(tt('Transport Company', '运输公司'), [
+        row(tt('Transport company', '运输公司'), data.transport_company),
+        row(tt('Transport contact', '运输联系人'), data.transport_contact),
+        row(tt('Transport phone', '运输电话'), data.transport_phone),
+        row(tt('Transport email', '运输邮箱'), data.transport_email),
+      ].join(''));
+      body += itemsHtml;
+      body += section(tt('Driver Details', '司机信息'), [
+        row(tt('Driver name', '司机姓名'), data.driver_name),
+        row(tt('Phone number', '司机电话'), data.driver_phone),
+        row(tt('Vehicle rego', '车辆牌照'), data.vehicle_rego),
+      ].join(''));
+    } else if (kind === 'dispatch') {
       body += section(tt('Report Info', '报告信息'), [
         row(tt('Report #', '报告编号'), data.report_no),
         row(tt('Date', '日期'), data.date),
@@ -293,9 +340,9 @@ window.SigningPDF = {
       ].join(''));
     }
 
-    const title = t(kind === 'dispatch' ? 'Dispatch Report' : 'Forklift Rental Agreement',
-                    kind === 'dispatch' ? '发货报告' : '叉车租赁协议');
-    const sigLabel = kind === 'dispatch' ? tt('Driver signature', '司机签字') : tt('Lessee signature', '承租方签字');
+    const title = t(kind === 'delivery' ? 'Delivery Order Sign-Off' : kind === 'dispatch' ? 'Dispatch Report' : 'Forklift Rental Agreement',
+                    kind === 'delivery' ? '送货签收单' : kind === 'dispatch' ? '发货报告' : '叉车租赁协议');
+    const sigLabel = kind === 'rental' ? tt('Lessee signature', '承租方签字') : tt('Driver signature', '司机签字');
     const stamp = `${t('Signed on', '签字时间')}: ` + new Date().toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-AU');
 
     const html = `
@@ -392,6 +439,7 @@ window.SigningPDF = {
     const y = (PAGE_H - imgH) / 2;
     const imgData = canvas.toDataURL('image/png');
     doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
+    const pdfDataUrl = doc.output('datauristring');
     doc.save(fname);
 
     try {
@@ -399,16 +447,16 @@ window.SigningPDF = {
         window.parent.postMessage({ type: 'signed', kind, filename: fname, fields: data }, '*');
       }
     } catch {}
-    return { filename: fname };
+    return { filename: fname, pdfDataUrl };
   }
 };
 
 // ───────────────────────── Root ───────────────────────────────────────────
 function App() {
-  // Routes: 'home' | 'dispatch' | 'rental' | 'done'
+  // Routes: 'home' | 'delivery' | 'dispatch' | 'rental' | 'done'
   const initialRoute = () => {
     const h = (window.location.hash || '').replace(/^#\/?/, '');
-    return ['home','dispatch','rental','done'].includes(h) ? h : 'home';
+    return ['home','delivery','dispatch','rental','done'].includes(h) ? h : 'home';
   };
   const [route, setRoute] = useState(initialRoute);
   const [lang, setLang] = useState(() => {
@@ -433,6 +481,7 @@ function App() {
   const onDone = (payload) => { setDonePayload(payload); setRoute('done'); };
 
   if (route === 'home') return <Home lang={lang} setLang={setLang} go={go} />;
+  if (route === 'delivery') return <window.DeliveryOrderForm lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
   if (route === 'dispatch') return <window.DispatchForm lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
   if (route === 'rental')   return <window.RentalForm   lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
   if (route === 'done')     return <Done lang={lang} payload={donePayload} restart={() => setRoute(donePayload?.kind || 'home')} goHome={goHome} />;

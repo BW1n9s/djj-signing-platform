@@ -9,10 +9,18 @@ const { useState, useEffect, useRef, useMemo } = React;
 const T = {
   en: {
     backHome: '← Home',
+    docDelivery: 'Delivery Order Sign-Off',
     docDispatch: 'Dispatch Report',
     docRental: 'Forklift Rental Agreement',
-    section: { meta: 'Report Info', vehicle: 'Vehicle / Equipment', times: 'Times', ratings: 'Ratings (1–5)', staff: 'Staff', issues: 'Issues / Notes', lessor: 'Lessor', lessee: 'Lessee', period: 'Rental Period', forklift: 'Forklift', charges: 'Charges', card: 'Credit Card', exec: 'Execution & Signature', sign: 'Signature' },
+    section: { order: 'Order Reference', delivery: 'Delivery Details', transport: 'Transport Company', driver: 'Driver Details', items: 'Items', meta: 'Report Info', vehicle: 'Vehicle / Equipment', times: 'Times', ratings: 'Ratings (1–5)', staff: 'Staff', issues: 'Issues / Notes', lessor: 'Lessor', lessee: 'Lessee', period: 'Rental Period', forklift: 'Forklift', charges: 'Charges', card: 'Credit Card', exec: 'Execution & Signature', sign: 'Signature' },
     fields: {
+      invoice_no: 'Tax invoice #', invoice_date: 'Invoice date', sales_rep: 'Sales rep',
+      pickup_location: 'Pick up location', customer_name: 'Customer name', customer_abn: 'Customer ABN',
+      delivery_address: 'Delivery address', delivery_contact: 'Contact name',
+      delivery_phone: 'Contact phone', delivery_email: 'Contact email',
+      transport_company: 'Transport company', transport_contact: 'Transport contact',
+      transport_phone: 'Transport phone', transport_email: 'Transport email',
+      driver_name: 'Driver name', driver_phone: 'Phone number', vehicle_rego: 'Vehicle rego',
       report_no: 'Report #', date: 'Date', rego: 'Rego / Plate', invoice: 'Invoice #',
       driver: 'Driver', phone: 'Phone', serial: 'Serial #', model: 'Model',
       dispatch_time: 'Dispatch time', complete_time: 'Completion time',
@@ -29,6 +37,12 @@ const T = {
       full_name: 'Full name', position: 'Position',
     },
     saveDownload: 'Save & Download PDF',
+    deliverySubmit: 'Generate PDF & Submit',
+    copyLink: 'Copy driver signing link',
+    copiedLink: 'Signing link copied.',
+    emailedViaBridge: 'PDF generated and passed to the email automation bridge.',
+    emailedViaHost: 'PDF generated and handed to the host automation.',
+    missingMailer: 'PDF generated locally. Connect Gmail/Lark automation to send it automatically.',
     clear: 'Clear', langToggle: '中文',
     required: 'required',
     larkPrefilled: 'Lark prefilled',
@@ -38,10 +52,18 @@ const T = {
   },
   zh: {
     backHome: '← 返回',
+    docDelivery: '送货签收单',
     docDispatch: '发货报告',
     docRental: '叉车租赁协议',
-    section: { meta: '报告信息', vehicle: '车辆/设备', times: '时间', ratings: '评分 (1–5)', staff: '人员', issues: '问题/备注', lessor: '出租方', lessee: '承租方', period: '租期', forklift: '叉车', charges: '费用', card: '信用卡', exec: '签署', sign: '签字' },
+    section: { order: '订单参考', delivery: '送货信息', transport: '运输公司', driver: '司机信息', items: '货物明细', meta: '报告信息', vehicle: '车辆/设备', times: '时间', ratings: '评分 (1–5)', staff: '人员', issues: '问题/备注', lessor: '出租方', lessee: '承租方', period: '租期', forklift: '叉车', charges: '费用', card: '信用卡', exec: '签署', sign: '签字' },
     fields: {
+      invoice_no: '税务发票号', invoice_date: '发票日期', sales_rep: '销售代表',
+      pickup_location: '取货地点', customer_name: '客户名称', customer_abn: '客户 ABN',
+      delivery_address: '送货地址', delivery_contact: '联系人',
+      delivery_phone: '联系电话', delivery_email: '联系邮箱',
+      transport_company: '运输公司', transport_contact: '运输联系人',
+      transport_phone: '运输电话', transport_email: '运输邮箱',
+      driver_name: '司机姓名', driver_phone: '司机电话', vehicle_rego: '车辆牌照',
       report_no: '报告编号', date: '日期', rego: '车牌', invoice: '订单编号',
       driver: '司机姓名', phone: '司机电话', serial: '车辆编号', model: '车辆型号',
       dispatch_time: '发货时间', complete_time: '完成时间',
@@ -58,6 +80,12 @@ const T = {
       full_name: '全名', position: '职位',
     },
     saveDownload: '保存并下载 PDF',
+    deliverySubmit: '生成 PDF 并提交',
+    copyLink: '复制司机签署链接',
+    copiedLink: '签署链接已复制。',
+    emailedViaBridge: 'PDF 已生成，并已交给邮件自动化桥接。',
+    emailedViaHost: 'PDF 已生成，并已交给宿主自动化流程。',
+    missingMailer: 'PDF 已在本地生成；自动发送仍需接入 Gmail / 飞书流程。',
     clear: '清除', langToggle: 'EN',
     required: '必填',
     larkPrefilled: '飞书已预填',
@@ -144,6 +172,56 @@ function TextArea({ name, en, zh, lang, value, onChange, rows = 3 }) {
   );
 }
 
+function StaticField({ label, value, wide }) {
+  return (
+    <div style={{
+      gridColumn: wide ? '1 / -1' : 'auto',
+      minHeight: 68, padding: '10px 12px',
+      border: '1px solid var(--rule)', borderRadius: 6,
+      background: '#faf9f5',
+    }}>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 5 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 15, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {value || '—'}
+      </div>
+    </div>
+  );
+}
+
+function DeliveryItems({ items, lang }) {
+  const rows = Array.isArray(items) && items.length ? items : [{}];
+  const labels = lang === 'zh'
+    ? { desc: '描述', model: '型号', serial: 'VIN / 序列号', qty: '数量' }
+    : { desc: 'Description', model: 'Model', serial: 'VIN / Serial', qty: 'Qty' };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {rows.map((item, idx) => (
+        <div key={idx} style={{
+          border: '1px solid var(--rule)', borderRadius: 6,
+          padding: 12, background: '#fff',
+        }}>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8 }}>
+            {lang === 'zh' ? `货物 ${idx + 1}` : `Item ${idx + 1}`}
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 10,
+          }}>
+            <StaticField label={labels.desc} value={item.description} wide />
+            <StaticField label={labels.model} value={item.model} />
+            <StaticField label={labels.serial} value={item.serial || item.vin} />
+            <StaticField label={labels.qty} value={item.quantity || item.qty} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Rating({ name, en, zh, lang, value, onChange }) {
   return (
     <div style={{
@@ -214,6 +292,64 @@ function readPrefill() {
   } catch { return {}; }
 }
 
+function parseDeliveryItems(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function hydrateDeliveryPrefill(raw) {
+  const items = parseDeliveryItems(raw.delivery_items || raw.items);
+  return {
+    ...raw,
+    items: items.length ? items : undefined,
+  };
+}
+
+function buildDeliveryShareUrl(data) {
+  const url = new URL(window.location.href);
+  url.hash = '/delivery';
+  url.search = '';
+  const fields = [
+    'invoice_no', 'invoice_date', 'sales_rep', 'pickup_location',
+    'customer_name', 'customer_abn', 'delivery_address', 'delivery_contact',
+    'delivery_phone', 'delivery_email', 'transport_company', 'transport_contact',
+    'transport_phone', 'transport_email',
+  ];
+  fields.forEach((key) => {
+    if (data[key]) url.searchParams.set(key, data[key]);
+  });
+  if (Array.isArray(data.items) && data.items.length) {
+    url.searchParams.set('delivery_items', JSON.stringify(data.items));
+  }
+  return url.toString();
+}
+
+const DEFAULT_DELIVERY = {
+  invoice_no: '',
+  invoice_date: '',
+  sales_rep: '',
+  pickup_location: 'DJJ Brisbane — 65-67 Beal St, Meadowbrook QLD 4131',
+  customer_name: '',
+  customer_abn: '',
+  delivery_address: '',
+  delivery_contact: '',
+  delivery_phone: '',
+  delivery_email: '',
+  transport_company: '',
+  transport_contact: '',
+  transport_phone: '',
+  transport_email: '',
+  items: [],
+  driver_name: '',
+  driver_phone: '',
+  vehicle_rego: '',
+};
 // Default mock data (replaced by URL params / Lark when present)
 const DEFAULT_DISPATCH = {
   report_no: 'SW-2026-0511-018',
@@ -260,6 +396,83 @@ const DEFAULT_RENTAL = {
 const PREFILLED_RENTAL_KEYS = ['agreement_no','lessee_company','lessee_abn','contact_name','contact_phone','contact_email','delivery','start','end','f_desc','f_serial','f_weekly','f_delcol','initial','ongoing','full_name','position'];
 
 // ───────────────────── Doc shells (printable) ──────────────────────────────
+function DeliveryBody({ data, set, lang, sigSlot }) {
+  const t = T[lang];
+  const driver = (key, opts = {}) => (
+    <Field name={key} en={t.fields[key]} zh={T.zh.fields[key]} lang={lang}
+      value={data[key]} onChange={set} required
+      {...opts}
+    />
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <DocHeader
+        title={t.docDelivery}
+        subtitle={data.invoice_no || (lang === 'zh' ? '等待发票号' : 'Awaiting invoice #')}
+        badge="DJJ"
+      />
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 18,
+      }}>
+        <div>
+          <SectionHead>{t.section.order}</SectionHead>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+            <StaticField label={t.fields.invoice_no} value={data.invoice_no} />
+            <StaticField label={t.fields.invoice_date} value={data.invoice_date} />
+            <StaticField label={t.fields.sales_rep} value={data.sales_rep} />
+            <StaticField label={t.fields.pickup_location} value={data.pickup_location} wide />
+          </div>
+        </div>
+
+        <div>
+          <SectionHead>{t.section.delivery}</SectionHead>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+            <StaticField label={t.fields.customer_name} value={data.customer_name} />
+            <StaticField label={t.fields.customer_abn} value={data.customer_abn} />
+            <StaticField label={t.fields.delivery_address} value={data.delivery_address} wide />
+            <StaticField label={t.fields.delivery_contact} value={data.delivery_contact} />
+            <StaticField label={t.fields.delivery_phone} value={data.delivery_phone} />
+            <StaticField label={t.fields.delivery_email} value={data.delivery_email} />
+          </div>
+        </div>
+      </div>
+
+      <SectionHead>{t.section.transport}</SectionHead>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 10,
+      }}>
+        <StaticField label={t.fields.transport_company} value={data.transport_company} />
+        <StaticField label={t.fields.transport_contact} value={data.transport_contact} />
+        <StaticField label={t.fields.transport_phone} value={data.transport_phone} />
+        <StaticField label={t.fields.transport_email} value={data.transport_email} />
+      </div>
+
+      <SectionHead>{t.section.items}</SectionHead>
+      <DeliveryItems items={data.items} lang={lang} />
+
+      <SectionHead>{t.section.driver}</SectionHead>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 10,
+      }}>
+        {driver('driver_name')}
+        {driver('driver_phone')}
+        {driver('vehicle_rego')}
+      </div>
+
+      <SectionHead>{t.section.sign}</SectionHead>
+      {sigSlot}
+    </div>
+  );
+}
+
 function DispatchBody({ data, set, lang, sigSlot }) {
   const t = T[lang];
   const F = (key, opts = {}) => (
@@ -372,39 +585,78 @@ function RentalBody({ data, set, lang, sigSlot }) {
 function makeForm(kind) {
   return function FormView({ lang, setLang, goHome, onDone }) {
     const t = T[lang];
-    const defaults = kind === 'dispatch' ? DEFAULT_DISPATCH : DEFAULT_RENTAL;
-    const [data, setData] = useState(() => ({ ...defaults, ...readPrefill() }));
+    const defaults = kind === 'delivery'
+      ? DEFAULT_DELIVERY
+      : kind === 'dispatch'
+        ? DEFAULT_DISPATCH
+        : DEFAULT_RENTAL;
+    const [data, setData] = useState(() => {
+      const raw = readPrefill();
+      const prefill = kind === 'delivery' ? hydrateDeliveryPrefill(raw) : raw;
+      return { ...defaults, ...prefill, items: prefill.items || defaults.items };
+    });
     const set = (k, v) => setData(d => ({ ...d, [k]: v }));
     const sigRef = useRef(null);
     const [sigEmpty, setSigEmpty] = useState(true);
     const [err, setErr] = useState('');
+    const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
     const printRef = useRef(null);
 
     // Expose Lark hook on window for the embedding host to call
     useEffect(() => {
-      window.LarkFill = (obj) => setData(d => ({ ...d, ...obj }));
+      window.LarkFill = (obj) => setData(d => {
+        const next = kind === 'delivery' ? hydrateDeliveryPrefill(obj || {}) : (obj || {});
+        return { ...d, ...next, items: next.items || d.items };
+      });
       const onMsg = (e) => {
         if (e?.data?.type === 'lark:fill' && e.data.payload) {
-          setData(d => ({ ...d, ...e.data.payload }));
+          setData(d => {
+            const next = kind === 'delivery' ? hydrateDeliveryPrefill(e.data.payload) : e.data.payload;
+            return { ...d, ...next, items: next.items || d.items };
+          });
         }
       };
       window.addEventListener('message', onMsg);
       return () => window.removeEventListener('message', onMsg);
-    }, []);
+    }, [kind]);
 
     const submit = async () => {
+      if (kind === 'delivery' && (!data.driver_name || !data.driver_phone || !data.vehicle_rego)) {
+        setErr(lang === 'zh' ? '请填写司机姓名、电话和车牌。' : 'Please fill driver name, phone, and vehicle rego.');
+        return;
+      }
       if (sigRef.current?.isEmpty?.()) { setErr(t.needSig); return; }
-      setErr(''); setBusy(true);
+      setErr(''); setNote(''); setBusy(true);
       try {
         // 1. Stamp signature into the printable region
         const sigImg = sigRef.current.toDataURL();
         // 2. Build a clean printable doc using current values
-        const filename = (kind === 'dispatch'
-          ? (data.report_no || 'dispatch-report')
-          : (data.agreement_no || 'rental-agreement')) + '.pdf';
-        await window.SigningPDF.generate({ kind, data, sigImg, lang, filename });
-        onDone({ kind, data, sigImg, filename });
+        const filename = (kind === 'delivery'
+          ? (data.invoice_no || 'delivery-order')
+          : kind === 'dispatch'
+            ? (data.report_no || 'dispatch-report')
+            : (data.agreement_no || 'rental-agreement')) + '.pdf';
+        const generated = await window.SigningPDF.generate({ kind, data, sigImg, lang, filename });
+        if (kind === 'delivery') {
+          const emailPayload = {
+            to: 'anita@djjequipment.com.au',
+            subject: `DJJ Delivery Order ${data.invoice_no || ''}`.trim(),
+            filename,
+            data,
+            pdfDataUrl: generated?.pdfDataUrl || '',
+          };
+          if (window.DeliveryOrderMailer?.send) {
+            await window.DeliveryOrderMailer.send(emailPayload);
+            setNote(t.emailedViaBridge);
+          } else if (window.parent !== window) {
+            window.parent.postMessage({ type: 'delivery-order:ready-to-email', payload: emailPayload }, '*');
+            setNote(t.emailedViaHost);
+          } else {
+            setNote(t.missingMailer);
+          }
+        }
+        onDone({ kind, data, sigImg, filename, pdfDataUrl: generated?.pdfDataUrl || '' });
       } catch (e) {
         console.error(e);
         setErr('PDF generation failed — see console.');
@@ -416,8 +668,8 @@ function makeForm(kind) {
     const sigSlot = (
       <div>
         <window.SigPad ref={sigRef} height={180} lang={lang}
-          label={kind === 'dispatch' ? 'DRIVER SIGNATURE' : 'LESSEE SIGNATURE'}
-          zhLabel={kind === 'dispatch' ? '司机签字' : '承租方签字'}
+          label={kind === 'rental' ? 'LESSEE SIGNATURE' : 'DRIVER SIGNATURE'}
+          zhLabel={kind === 'rental' ? '承租方签字' : '司机签字'}
           onChange={empty => setSigEmpty(empty)}
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
@@ -431,17 +683,44 @@ function makeForm(kind) {
       </div>
     );
 
-    const body = kind === 'dispatch'
-      ? <DispatchBody data={data} set={set} lang={lang} sigSlot={sigSlot} />
-      : <RentalBody  data={data} set={set} lang={lang} sigSlot={sigSlot} />;
+    const body = kind === 'delivery'
+      ? <DeliveryBody data={data} set={set} lang={lang} sigSlot={sigSlot} />
+      : kind === 'dispatch'
+        ? <DispatchBody data={data} set={set} lang={lang} sigSlot={sigSlot} />
+        : <RentalBody  data={data} set={set} lang={lang} sigSlot={sigSlot} />;
+
+    const copyLink = async () => {
+      const link = buildDeliveryShareUrl(data);
+      try {
+        await navigator.clipboard.writeText(link);
+        setErr('');
+        setNote(t.copiedLink);
+      } catch {
+        setErr(lang === 'zh' ? '复制失败，请手动复制浏览器地址。' : 'Copy failed. Please copy the browser URL manually.');
+      }
+    };
 
     return (
       <window.AppShell
-        title={kind === 'dispatch' ? t.docDispatch : t.docRental}
+        title={kind === 'delivery' ? t.docDelivery : kind === 'dispatch' ? t.docDispatch : t.docRental}
         lang={lang} setLang={setLang} goHome={goHome}
         footer={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {err && <span style={{ color: 'var(--required)', fontSize: 13 }}>{err}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 220px' }}>
+              {err && <span style={{ color: 'var(--required)', fontSize: 13 }}>{err}</span>}
+              {note && <span style={{ color: 'var(--ok)', fontSize: 13 }}>{note}</span>}
+            </div>
+            {kind === 'delivery' && (
+              <button type="button" onClick={copyLink}
+                style={{
+                  minHeight: 44, padding: '0 16px',
+                  background: '#fff', color: 'var(--ink)',
+                  border: '1px solid var(--rule)', borderRadius: 6,
+                  fontSize: 14, fontWeight: 600,
+                }}>
+                {t.copyLink}
+              </button>
+            )}
             <button type="button" onClick={submit} disabled={busy}
               style={{
                 marginLeft: 'auto', minHeight: 48, padding: '0 20px',
@@ -450,7 +729,7 @@ function makeForm(kind) {
                 opacity: busy ? 0.6 : 1, cursor: sigEmpty ? 'not-allowed' : 'pointer',
                 minWidth: 220,
               }}>
-              {busy ? '…' : t.saveDownload}
+              {busy ? '…' : kind === 'delivery' ? t.deliverySubmit : t.saveDownload}
             </button>
           </div>
         }
@@ -463,5 +742,6 @@ function makeForm(kind) {
   };
 }
 
+window.DeliveryOrderForm = makeForm('delivery');
 window.DispatchForm = makeForm('dispatch');
 window.RentalForm   = makeForm('rental');
