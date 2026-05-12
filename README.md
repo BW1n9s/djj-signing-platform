@@ -1,21 +1,23 @@
 # DJJ Signing Platform
 
-Static signing website packaged as a minimal deployable bundle.
+Static signing website packaged as a lightweight multi-file app.
 
 ## Structure
 
-- `DJJ-Signing-App.html` - official standalone signing app.
-- `index.html` - lightweight redirect to `DJJ-Signing-App.html` for static hosts.
-
-The deployable app is self-contained in `DJJ-Signing-App.html`; supporting runtime assets are bundled into that file.
+- `index.html` - lightweight redirect for static hosts.
+- `app/index.html` - browser entrypoint for the signing app.
+- `app/*.jsx` - readable client-side modules loaded by Babel in the browser.
+- `djjlogo.png` - shared logo asset used by the UI and PDF generation.
 
 ## Run Locally
 
-Serve the folder with any static web server, then open the local URL:
+Serve the folder with any static web server, then open the local URL or the app entrypoint directly:
 
 ```powershell
 python -m http.server 8000
 ```
+
+Open `/` or `/app/index.html`.
 
 The site depends on CDN-hosted React, Babel, jsPDF, html2canvas, and Google Fonts.
 
