@@ -227,7 +227,7 @@ window.addEventListener('message', async (e) => {
 ## CORS 说明
 
 Worker 已开启全局 CORS（Hono `cors()` middleware）。  
-生产环境建议在 `server/src/index.js` 中限制来源：
+生产环境建议在 `src/index.js` 中限制来源：
 
 ```js
 app.use('*', cors({ origin: 'https://bw1n9s.github.io' }));
