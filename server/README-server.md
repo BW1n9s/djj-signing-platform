@@ -1,16 +1,15 @@
 # DJJ Signing Platform — Server
 
-Lark Bot 后端服务，基于 Node.js + Express。  
-Node.js + Express backend for the DJJ Signing Platform Lark Bot.
+Lark Bot 后端服务，运行在 **Cloudflare Workers**，使用 **Hono** 框架。  
+Lark Bot backend running on **Cloudflare Workers** with the **Hono** framework.
 
 ---
 
 ## 目录 / Contents
 
 - [架构说明](#架构说明)
-- [本地运行](#本地运行)
-- [Railway 部署](#railway-部署)
-- [Render 部署](#render-部署)
+- [本地开发](#本地开发)
+- [Cloudflare Workers 部署](#cloudflare-workers-部署)
 - [环境变量获取指南](#环境变量获取指南)
 - [Lark 后台配置](#lark-后台配置)
 - [前端 DeliveryOrderMailer 桥接配置](#前端-deliveryordermailerbridgeconfig)
@@ -26,56 +25,93 @@ POST /delivery/signed    ← 前端签字完成后发送 PDF 的接口
 GET  /health             ← 健康检查
 ```
 
+**文件结构 / File structure:**
+```
+wrangler.toml              ← 部署配置（repo 根目录）
+server/
+  src/
+    index.js               ← Hono 应用入口 + CF Workers export default
+    lark/
+      client.js            ← getTenantAccessToken / sendMessage / sendCard
+      webhook.js           ← POST /lark/webhook + /lark/card-action
+    gmail/
+      auth.js              ← getGmailAccessToken（refresh_token → access_token）
+      search.js            ← searchDeliveryEmails / parseEmailToDeliveryData
+    delivery/
+      buildLink.js         ← buildDriverSigningUrl（prefill URL 生成）
+      mailer.js            ← sendSignedPDF（Gmail REST API 发送邮件）
+  package.json
+  .dev.vars.example
+  README-server.md
+```
+
 **交互流程 / Interaction flow:**
 
-1. 司机/操作员在飞书私聊 Bot，发送含触发关键词的消息
-2. Bot 回复"正在搜索…"，调用 Gmail API 搜索最近 30 天的 picking list / booking confirmation
-3. 若找到多封邮件，发送卡片让用户选择；若只有一封，直接处理
-4. Bot 提取订单信息，返回司机签字链接（含预填参数）
-5. 司机打开链接，完成签字
-6. 前端调用 `POST /delivery/signed`，后端发送 PDF 至 anita@djjequipment.com.au，并通知操作员
+1. 操作员在飞书私聊 Bot，发送含触发关键词的消息
+2. Bot 回复"正在搜索…"，调用 Gmail API 搜索最近 30 天送货邮件
+3. 找到多封时发送卡片让操作员选择；只有一封时直接处理
+4. Bot 提取订单信息，发送司机签字链接（含预填参数）
+5. 司机打开链接完成签字
+6. 前端调用 `POST /delivery/signed`，后端发 PDF 至 anita@djjequipment.com.au 并通知操作员
 
 ---
 
-## 本地运行
+## 本地开发
 
 ```bash
-cd server
-cp .env.example .env
-# 填写 .env 中的所有变量
+# 1. 安装依赖 / Install dependencies
+cd server && npm install
 
-npm install
-npm run dev   # node --watch index.js（Node 20+）
-# 或 npm start
+# 2. 复制并填写本地开发变量 / Copy and fill in local dev vars
+cp .dev.vars.example .dev.vars
+# 编辑 .dev.vars，填写所有值
+
+# 3. 启动本地 Worker / Start local Worker
+npm run dev
+# 等同于: wrangler dev --config ../wrangler.toml
 ```
 
 ---
 
-## Railway 部署
+## Cloudflare Workers 部署
 
-1. 登录 [Railway](https://railway.app) → **New Project → Deploy from GitHub repo**
-2. 选择 `BW1n9s/djj-signing-platform`
-3. 在 **Settings → Build** 中：
-   - **Root Directory**：留空（使用仓库根目录）
-   - **Dockerfile Path**：`server/Dockerfile`
-4. 在 **Variables** 面板中添加所有环境变量（参见[下方说明](#环境变量获取指南)）
-5. 部署完成后，复制 Railway 给的域名，例如 `https://djj-server-production.up.railway.app`
-6. 将该域名填入 Lark 后台（见[下方配置](#lark-后台配置)）
+### 一键部署步骤
 
-> **自定义域名（可选）**：在 Railway Settings → Domains 绑定自己的域名。
+```bash
+# 1. 安装 wrangler CLI（全局）/ Install wrangler globally
+npm install -g wrangler
 
----
+# 2. 登录 Cloudflare 账户 / Log in to Cloudflare
+wrangler login
 
-## Render 部署
+# 3. 安装项目依赖 / Install project dependencies
+cd server && npm install && cd ..
 
-1. 登录 [Render](https://render.com) → **New Web Service → Connect GitHub**
-2. 选择仓库，配置：
-   - **Root Directory**: `server`
-   - **Build Command**: `npm ci --omit=dev`
-   - **Start Command**: `node index.js`
-   - **Environment**: Node
-3. 添加所有环境变量
-4. 部署完成后记录域名
+# 4. 设置所有 Secret / Set all secrets (one by one)
+wrangler secret put LARK_APP_ID
+wrangler secret put LARK_APP_SECRET
+wrangler secret put LARK_VERIFICATION_TOKEN
+wrangler secret put GMAIL_CLIENT_ID
+wrangler secret put GMAIL_CLIENT_SECRET
+wrangler secret put GMAIL_REFRESH_TOKEN
+wrangler secret put GMAIL_USER
+
+# 5. 部署 / Deploy
+wrangler deploy
+```
+
+部署成功后，Worker URL 格式为：  
+After deploy, the Worker URL will be:
+```
+https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev
+```
+
+`YOUR_SUBDOMAIN` 是你的 Cloudflare Workers 子域名，可在 Cloudflare Dashboard → Workers & Pages 查看。  
+`YOUR_SUBDOMAIN` is your Cloudflare Workers subdomain, visible in Cloudflare Dashboard → Workers & Pages.
+
+### 自定义域名（可选）/ Custom domain (optional)
+
+Cloudflare Dashboard → Workers & Pages → djj-signing-bot → Settings → Domains & Routes → Add Custom Domain
 
 ---
 
@@ -83,13 +119,13 @@ npm run dev   # node --watch index.js（Node 20+）
 
 ### LARK_APP_ID / LARK_APP_SECRET
 
-1. 打开 [飞书开放平台](https://open.feishu.cn/app) → 选择你的应用
+1. 打开 [飞书开放平台](https://open.feishu.cn/app) → 选择应用
 2. **凭证与基础信息** → 复制 **App ID** 和 **App Secret**
 
 ### LARK_VERIFICATION_TOKEN
 
 1. 同一应用页面 → **事件订阅**
-2. **验证令牌（Verification Token）** 字段中复制
+2. 复制 **验证令牌（Verification Token）**
 
 ### Gmail OAuth2（GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN）
 
@@ -106,7 +142,7 @@ npm run dev   # node --watch index.js（Node 20+）
 
 1. 打开 [OAuth Playground](https://developers.google.com/oauthplayground)
 2. 右上角齿轮 → 勾选 **Use your own OAuth credentials** → 填入 Client ID / Secret
-3. 左侧找 **Gmail API v1** → 选择 `https://mail.google.com/` → **Authorize APIs**
+3. 左侧 **Gmail API v1** → 选择 `https://mail.google.com/` → **Authorize APIs**
 4. 用 `john.wang@djjequipment.com.au` 账户授权
 5. **Step 2: Exchange authorization code for tokens** → 点击 **Exchange**
 6. 复制 **Refresh token**
@@ -124,72 +160,64 @@ npm run dev   # node --watch index.js（Node 20+）
 1. 飞书开放平台 → 应用 → **事件订阅**
 2. **请求网址（Request URL）** 填写：
    ```
-   https://YOUR_DOMAIN/lark/webhook
+   https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev/lark/webhook
    ```
-3. 添加订阅事件：`im.message.receive_v1`（接收消息）
-4. 保存后飞书会向该 URL 发送验证请求（challenge），后端自动处理
+3. 添加订阅事件：`im.message.receive_v1`
+4. 保存后飞书会发 challenge 验证请求，Worker 自动响应
 
 ### 2. 配置卡片回调 URL（Card Request URL）
 
-1. 飞书开放平台 → 应用 → **应用功能 → 机器人**
+1. 应用 → **应用功能 → 机器人**
 2. **消息卡片请求网址** 填写：
    ```
-   https://YOUR_DOMAIN/lark/card-action
+   https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev/lark/card-action
    ```
 
-### 3. 开启机器人能力
+### 3. 开启机器人能力 & 申请权限
 
-1. 飞书开放平台 → 应用 → **应用功能 → 机器人**
-2. 开启"机器人"，发布应用
-
-### 4. 申请权限
-
-在 **权限管理** 中申请：
-- `im:message`（读写消息）
-- `im:message.group_at_msg`（如需群消息）
+1. **应用功能 → 机器人** → 开启，发布应用
+2. **权限管理** → 申请 `im:message`（读写消息）
 
 ---
 
 ## 前端 DeliveryOrderMailer Bridge 配置
 
-前端签字完成后会触发 `postMessage`，但静态页无法直接调用后端。  
-需要在**嵌套前端页面的外层页面**（或在 `app/index.html` 加载后注入）中注册 bridge：
+前端签字完成后触发 `postMessage`，但静态页无法直接访问后端。  
+在嵌套前端的外层页面（或 App Shell）中注册 bridge：
 
 ```html
 <script>
   window.DeliveryOrderMailer = {
     send: async (payload) => {
-      // payload 由前端自动提供，包含 to, subject, filename, pdfDataUrl, data
-      // payload is provided automatically by the frontend
-      const response = await fetch('https://YOUR_DOMAIN/delivery/signed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // 可在 payload 里追加 open_id，让 Bot 通知操作员
-        // Optionally add open_id so the Bot notifies the operator
-        body: JSON.stringify({
-          ...payload,
-          open_id: 'OPERATOR_OPEN_ID' // 可选 / optional
-        })
-      });
-      if (!response.ok) {
-        throw new Error('Failed to send signed PDF');
-      }
+      // payload 由前端自动提供：to, subject, filename, pdfDataUrl, data
+      const resp = await fetch(
+        'https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev/delivery/signed',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // 可追加 open_id，让 Bot 在飞书里通知操作员（可选）
+          body: JSON.stringify({ ...payload, open_id: 'OPERATOR_OPEN_ID' })
+        }
+      );
+      if (!resp.ok) throw new Error('Failed to send signed PDF');
     }
   };
 </script>
 ```
 
-将此 `<script>` 块放在嵌套 `<iframe>` 之前，或通过 `postMessage` 监听注入：
+或通过 `postMessage` 监听签字完成事件（父页面 / parent wrapper page）：
 
 ```js
-// 父页面监听子页面的签字完成事件，然后调用后端
 window.addEventListener('message', async (e) => {
   if (e.data?.type === 'delivery-order:ready-to-email') {
-    await fetch('https://YOUR_DOMAIN/delivery/signed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(e.data.payload)
-    });
+    await fetch(
+      'https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev/delivery/signed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(e.data.payload)
+      }
+    );
   }
 });
 ```
@@ -198,9 +226,20 @@ window.addEventListener('message', async (e) => {
 
 ## CORS 说明
 
-后端已开启全局 CORS（`cors()` middleware）。  
-生产环境建议在 `server/index.js` 中限制来源：
+Worker 已开启全局 CORS（Hono `cors()` middleware）。  
+生产环境建议在 `server/src/index.js` 中限制来源：
 
 ```js
-app.use(cors({ origin: 'https://bw1n9s.github.io' }));
+app.use('*', cors({ origin: 'https://bw1n9s.github.io' }));
 ```
+
+---
+
+## 注意事项 / Known Limitations
+
+- **卡片选择状态**：`pendingSelections` 存储在 Worker 实例内存中，不跨实例共享。  
+  如需高可用，可将状态迁移至 Cloudflare KV 或 Durable Objects。  
+  Card selection state is in-memory per Worker instance; use Cloudflare KV/Durable Objects for HA.
+
+- **`Buffer` 可用性**：`wrangler.toml` 已设置 `nodejs_compat`，`Buffer` 在 Worker 中可用。  
+  Buffer is available because `nodejs_compat` is set in `wrangler.toml`.

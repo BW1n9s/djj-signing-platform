@@ -13,3 +13,6 @@ build/
 # Environment secrets — 绝不提交真实凭据
 .env
 server/.env
+# Cloudflare Workers 本地开发变量 / CF Workers local dev vars
+.dev.vars
+server/.dev.vars

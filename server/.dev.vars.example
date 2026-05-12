@@ -1,0 +1,17 @@
+# Cloudflare Workers 本地开发变量 / Local dev vars for Cloudflare Workers
+# 复制为 .dev.vars 并填写真实值 / Copy to .dev.vars and fill in real values
+# .dev.vars 已在 .gitignore 中排除，不要提交 / .dev.vars is gitignored — never commit it
+
+# Lark / 飞书
+LARK_APP_ID=cli_aa8818fd3cb8ded2
+LARK_APP_SECRET=
+LARK_VERIFICATION_TOKEN=
+
+# Gmail OAuth2
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+GMAIL_USER=
+
+# Deployment / 部署（wrangler.toml [vars] 中已设置，本地开发时在此覆盖）
+SIGNING_BASE_URL=https://bw1n9s.github.io/djj-signing-platform/app/index.html

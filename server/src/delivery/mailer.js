@@ -1,39 +1,38 @@
-// 发送签字后 PDF 邮件 / Send signed PDF email via Gmail API
-'use strict';
-
-const { google } = require('googleapis');
-const { getOAuth2Client } = require('../gmail/auth');
+// 发送签字后 PDF 邮件 / Send signed PDF email via Gmail REST API
+// 直接调用 Gmail API（fetch），替代 googleapis 包
+// Uses Gmail REST API via fetch — no googleapis package needed
+import { getGmailAccessToken } from '../gmail/auth.js';
 
 const DEFAULT_TO = 'anita@djjequipment.com.au';
-const GMAIL_USER = () => process.env.GMAIL_USER || 'me';
+const GMAIL_SEND_API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 
 /**
  * 通过 Gmail API 发送签字后的 PDF 邮件
  * Send signed PDF via Gmail API
  *
+ * @param {object} env                CF Workers env bindings
  * @param {object} opts
- * @param {string} [opts.to]         收件人（默认 anita@djjequipment.com.au）
- * @param {string} [opts.subject]    邮件主题
- * @param {string} [opts.filename]   PDF 文件名
- * @param {string}  opts.pdfDataUrl  base64 data URL（data:application/pdf;base64,...）
- * @param {object} [opts.data]       签字表单数据，用于正文摘要
+ * @param {string} [opts.to]          收件人（默认 anita@djjequipment.com.au）
+ * @param {string} [opts.subject]     邮件主题
+ * @param {string} [opts.filename]    PDF 文件名
+ * @param {string}  opts.pdfDataUrl   base64 data URL（data:application/pdf;base64,...）
+ * @param {object} [opts.data]        签字表单数据，用于正文摘要
  */
-async function sendSignedPDF({ to, subject, filename, pdfDataUrl, data }) {
-  const auth = getOAuth2Client();
-  const gmail = google.gmail({ version: 'v1', auth });
+export async function sendSignedPDF(env, { to, subject, filename, pdfDataUrl, data }) {
+  const token = await getGmailAccessToken(env);
 
   const recipient = to || DEFAULT_TO;
   const emailSubject = subject || buildSubject(data);
   const pdfFilename = filename || `delivery-order-${data?.invoice_no || Date.now()}.pdf`;
 
-  // 澳大利亚东部时间签字时间 / Signing timestamp in Australian Eastern Time
+  // 澳大利亚东部时间 / Australian Eastern Time
   const signedAt = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney' });
 
-  // 将 data URL 中的 base64 部分转换为 Buffer / Strip data URL prefix and decode base64
+  // 将 data URL base64 部分解码为 Buffer / Decode base64 data URL to Buffer
   const base64Data = pdfDataUrl.replace(/^data:application\/pdf;base64,/, '');
   const pdfBuffer = Buffer.from(base64Data, 'base64');
 
-  // RFC 2822 邮件正文 / RFC 2822 email body
+  // 邮件正文 / Email body (plain text)
   const bodyText = [
     'Dear Anita,',
     '',
@@ -48,7 +47,7 @@ async function sendSignedPDF({ to, subject, filename, pdfDataUrl, data }) {
     'This email was sent automatically by the DJJ Signing Platform.',
     '',
     'Regards,',
-    'DJJ Equipment Signing System'
+    'DJJ Equipment Signing System',
   ].join('\n');
 
   // 构建 multipart/mixed MIME 邮件 / Build multipart/mixed MIME message
@@ -74,24 +73,35 @@ async function sendSignedPDF({ to, subject, filename, pdfDataUrl, data }) {
     // 每 76 字符换行，符合 MIME 规范 / Wrap at 76 chars per MIME spec
     pdfBuffer.toString('base64').replace(/(.{76})/g, '$1\n').trimEnd(),
     '',
-    `--${boundary}--`
+    `--${boundary}--`,
   ];
 
   const rawEmail = rawParts.join('\n');
 
-  // Gmail API 要求 URL-safe base64 编码 / Gmail API requires URL-safe base64
+  // Gmail API 要求 URL-safe base64 编码（RFC 4648）/ URL-safe base64 required by Gmail API
   const encodedEmail = Buffer.from(rawEmail)
     .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
-  await gmail.users.messages.send({
-    userId: GMAIL_USER(),
-    requestBody: { raw: encodedEmail }
+  // POST /gmail/v1/users/me/messages/send
+  const resp = await fetch(GMAIL_SEND_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: encodedEmail }),
   });
 
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`[Gmail] Send message failed (${resp.status}): ${text}`);
+  }
+
   console.log(`[mailer] PDF sent to ${recipient} — ${emailSubject}`);
+  return resp.json();
 }
 
 function buildSubject(data) {
@@ -100,5 +110,3 @@ function buildSubject(data) {
   if (data?.customer_name) parts.push(`– ${data.customer_name}`);
   return parts.join(' ');
 }
-
-module.exports = { sendSignedPDF };
