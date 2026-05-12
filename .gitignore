@@ -9,3 +9,7 @@ build/
 
 # Local logs
 *.log
+
+# Environment secrets — 绝不提交真实凭据
+.env
+server/.env
