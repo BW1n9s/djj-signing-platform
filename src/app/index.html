@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DJJ Signing Platform</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#111111" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink: #111111;
+    --ink-2: #444;
+    --muted: #8b8b85;
+    --rule: #e4e3dd;
+    --rule-2: #efeeea;
+    --paper: #ffffff;
+    --panel: #f7f6f1;
+    --pre: #fff8d6;          /* Lark-prefilled highlight */
+    --pre-edge: #e6c43a;
+    --required: #c43c2a;     /* hot red for to-sign / required */
+    --ok: #1f7a3a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 24px -16px rgba(0,0,0,0.18);
+    --tap: 44px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #ece9e0;
+    color: var(--ink);
+    font-family: "Source Sans 3", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+  body { font-size: 16px; line-height: 1.4; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  #root { height: 100%; overflow: hidden; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- PDF: jsPDF + html2canvas (renders Chinese via system fonts → image → PDF) -->
+<script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="#ece9e0"/>
+    <rect x="22" y="18" width="56" height="64" rx="3" fill="#ffffff" stroke="#111" stroke-width="1.6"/>
+    <rect x="28" y="26" width="32" height="3" fill="#111"/>
+    <rect x="28" y="33" width="44" height="2" fill="#bbb"/>
+    <rect x="28" y="38" width="40" height="2" fill="#bbb"/>
+    <rect x="28" y="43" width="44" height="2" fill="#bbb"/>
+    <path d="M30 64 Q 38 52, 46 62 T 62 58 Q 68 70, 72 60" stroke="#c43c2a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <rect x="28" y="74" width="44" height="0.8" fill="#111"/>
+  </svg>
+</template>
+<div id="root"></div>
+
+<script type="text/babel" src="sig-pad.jsx"></script>
+<script type="text/babel" src="signing-forms.jsx"></script>
+<script type="text/babel" src="signing-app.jsx"></script>
+</body>
+</html>

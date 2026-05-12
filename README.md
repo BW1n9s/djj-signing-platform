@@ -4,12 +4,12 @@ Static signing website exported from Claude Design and reorganized for easier ma
 
 ## Structure
 
-- `index.html` - production entry for the signing website.
-- `src/app/` - signing app React JSX modules loaded by `index.html`.
-- `src/wireframes/` - original wireframe/design canvas source and preview page.
-- `assets/images/` - image assets.
-- `assets/documents/` - reference PDFs from the original upload bundle.
-- `archive/` - original single-file HTML export kept for reference.
+- `DJJ-Signing-App.html` - official standalone signing app.
+- `index.html` - lightweight redirect to `DJJ-Signing-App.html` for static hosts.
+- `src/app/` - readable app source modules from the export, kept for future edits.
+- `archive/claude-design-preview/` - Claude Design wireframe/preview files.
+- `archive/reference-documents/` - PDF references from the original upload bundle; duplicate copies are separated under `duplicates/`.
+- `archive/reference-assets/` - unused reference assets from the original bundle.
 
 ## Run Locally
 
