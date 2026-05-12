@@ -136,25 +136,6 @@ function Home({ lang, setLang, go }) {
             <Card k="dispatch" title={text.dispatch} hint={text.dispatchH} />
             <Card k="rental"   title={text.rental}   hint={text.rentalH} />
           </div>
-
-          <div style={{ marginTop: 36, padding: 16, background: '#fff', borderRadius: 10, border: '1px dashed var(--rule)' }}>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6, letterSpacing: 0.5 }}>
-              INTEGRATIONS · 接口
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
-              {lang === 'zh' ? (<>
-                · URL 预填：<span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>?driver=...&rego=...</span><br/>
-                · 飞书 / 邮箱：<span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>window.LarkFill(&#123;...&#125;)</span><br/>
-                · postMessage：<span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>&#123; type:'lark:fill', payload:&#123;…&#125; &#125;</span><br/>
-                · 签字后：本地生成并下载 PDF · 暴露 <span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>signed</span> postMessage 给宿主
-              </>) : (<>
-                · URL prefill: <span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>?driver=...&rego=...</span><br/>
-                · Lark / email: <span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>window.LarkFill(&#123;...&#125;)</span><br/>
-                · postMessage: <span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>&#123; type:'lark:fill', payload:&#123;…&#125; &#125;</span><br/>
-                · After sign: PDF saved locally · also posts <span className="mono" style={{ background: '#f4f3ee', padding: '0 4px' }}>signed</span> to host
-              </>)}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -211,9 +192,8 @@ function Done({ lang, payload, restart, goHome }) {
   );
 }
 
-// ───────────────────────── PDF builder (native jsPDF) ─────────────────────
-// Draw the report directly with jsPDF — no html2canvas. Reliable on iOS
-// Safari/Chrome, fast, selectable text, ~30 KB file size.
+// ───────────────────────── PDF builder ────────────────────────────────────
+// Render a compact A4 HTML sheet, then place it into a single-page PDF.
 async function loadLogoDataURL() {
   if (window.__djjLogoData) return window.__djjLogoData;
   try {
@@ -244,61 +224,73 @@ window.SigningPDF = {
     const cjkFont = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC","Noto Sans CJK SC",sans-serif';
     const fontStack = `"Source Sans 3","Helvetica Neue",Helvetica,Arial,${cjkFont}`;
 
-    const sec = (label) => `<div class="sec">${esc(label)}</div>`;
-    const row = (l, v) => `<div class="row"><div class="lbl">${esc(l)}</div><div class="val">${esc(v == null || v === '' ? '—' : v)}</div></div>`;
-    const block = (txt) => `<div class="block">${esc(txt || '—')}</div>`;
+    const val = (v) => esc(v == null || v === '' ? '—' : v);
+    const row = (l, v, wide = false) => `
+      <div class="field${wide ? ' wide' : ''}">
+        <div class="lbl">${esc(l)}</div>
+        <div class="val">${val(v)}</div>
+      </div>`;
+    const block = (l, txt) => row(l, txt, true);
+    const section = (label, rows) => `
+      <section class="pdf-section">
+        <div class="sec">${esc(label)}</div>
+        <div class="pdf-grid">${rows}</div>
+      </section>`;
 
     let body = '';
     if (kind === 'dispatch') {
-      body += sec(tt('Report Info', '报告信息'));
-      body += row(tt('Report #', '报告编号'),   data.report_no);
-      body += row(tt('Date', '日期'),            data.date);
-      body += row(tt('Rego', '车牌'),            data.rego);
-      body += row(tt('Invoice #', '订单编号'),   data.invoice);
-      body += row(tt('Driver', '司机姓名'),      data.driver);
-      body += row(tt('Phone', '司机电话'),       data.phone);
-      body += sec(tt('Vehicle / Equipment', '车辆/设备'));
-      body += row(tt('Serial #', '车辆编号'),    data.serial);
-      body += row(tt('Model', '车辆型号'),       data.model);
-      body += sec(tt('Times', '时间'));
-      body += row(tt('Dispatch time', '发货时间'),  data.dispatch_time);
-      body += row(tt('Completion time', '完成时间'), data.complete_time);
-      body += sec(tt('Staff', '人员'));
-      body += row(tt('Supervisor', '主管'),       data.supervisor);
-      body += row(tt('Operator', '操作人员'),     data.operator);
-      body += sec(tt('Ratings (1–5)', '评分 (1–5)'));
-      body += row(tt('Logistics company', '物流公司'), data.rating_log ? `${data.rating_log} / 5` : '');
-      body += row(tt('Driver', '运输司机'),            data.rating_drv ? `${data.rating_drv} / 5` : '');
-      body += sec(tt('Issues / Notes', '问题/备注'));
-      body += block(data.issues);
+      body += section(tt('Report Info', '报告信息'), [
+        row(tt('Report #', '报告编号'), data.report_no),
+        row(tt('Date', '日期'), data.date),
+        row(tt('Rego', '车牌'), data.rego),
+        row(tt('Invoice #', '订单编号'), data.invoice),
+        row(tt('Driver', '司机姓名'), data.driver),
+        row(tt('Phone', '司机电话'), data.phone),
+      ].join(''));
+      body += section(tt('Vehicle / Equipment', '车辆/设备'), [
+        row(tt('Serial #', '车辆编号'), data.serial),
+        row(tt('Model', '车辆型号'), data.model),
+      ].join(''));
+      body += section(tt('Times / Staff', '时间 / 人员'), [
+        row(tt('Dispatch time', '发货时间'), data.dispatch_time),
+        row(tt('Completion time', '完成时间'), data.complete_time),
+        row(tt('Supervisor', '主管'), data.supervisor),
+        row(tt('Operator', '操作人员'), data.operator),
+      ].join(''));
+      body += section(tt('Ratings / Notes', '评分 / 备注'), [
+        row(tt('Logistics company', '物流公司'), data.rating_log ? `${data.rating_log} / 5` : ''),
+        row(tt('Driver', '运输司机'), data.rating_drv ? `${data.rating_drv} / 5` : ''),
+        block(tt('Issues / Notes', '问题/备注'), data.issues),
+      ].join(''));
     } else {
-      body += sec(tt('Lessor', '出租方'));
-      body += block('DJJ Equipment Pty Ltd\nABN 56 615 358 275\n100 Derby Street, Silverwater NSW 2128');
-      body += sec(tt('Lessee', '承租方'));
-      body += row(tt('Company', '公司'),         data.lessee_company);
-      body += row(tt('ABN', 'ABN'),              data.lessee_abn);
-      body += row(tt('Contact', '联系人'),       data.contact_name);
-      body += row(tt('Phone', '电话'),           data.contact_phone);
-      body += row(tt('Email', '邮箱'),           data.contact_email);
-      body += row(tt('Delivery address', '收货地址'), data.delivery);
-      body += sec(tt('Rental Period', '租期'));
-      body += row(tt('Start', '起租'),           data.start);
-      body += row(tt('End', '到期'),             data.end);
-      body += sec(tt('Forklift', '叉车'));
-      body += row(tt('Description', '描述'),     data.f_desc);
-      body += row(tt('Serial #', '编号'),        data.f_serial);
-      body += row(tt('Weekly rate', '周租金'),   data.f_weekly ? `AUD $${data.f_weekly}` : '');
-      body += row(tt('Delivery & collection', '送货/回收费'), data.f_delcol ? `AUD $${data.f_delcol}` : '');
-      body += sec(tt('Charges', '费用'));
-      body += row(tt('Initial charge', '初始费用'), data.initial ? `AUD $${data.initial}` : '');
-      body += row(tt('Ongoing weekly', '后续周租'), data.ongoing ? `AUD $${data.ongoing}` : '');
-      body += sec(tt('Credit Card', '信用卡'));
-      body += row(tt('Name on card', '持卡人'),  data.card_name);
-      body += row(tt('Card number', '卡号'),     data.card_no ? '**** **** **** ' + String(data.card_no).slice(-4) : '');
-      body += row(tt('Expiry', '有效期'),        data.card_exp);
-      body += sec(tt('Execution', '签署'));
-      body += row(tt('Full name', '全名'),       data.full_name);
-      body += row(tt('Position', '职位'),        data.position);
+      body += section(tt('Parties', '合同方'), [
+        block(tt('Lessor', '出租方'), 'DJJ Equipment Pty Ltd\nABN 56 615 358 275\n100 Derby Street, Silverwater NSW 2128'),
+        row(tt('Company', '公司'), data.lessee_company),
+        row(tt('ABN', 'ABN'), data.lessee_abn),
+        row(tt('Contact', '联系人'), data.contact_name),
+        row(tt('Phone', '电话'), data.contact_phone),
+        row(tt('Email', '邮箱'), data.contact_email),
+        row(tt('Delivery address', '收货地址'), data.delivery),
+      ].join(''));
+      body += section(tt('Rental Period / Forklift', '租期 / 叉车'), [
+        row(tt('Start', '起租'), data.start),
+        row(tt('End', '到期'), data.end),
+        row(tt('Description', '描述'), data.f_desc),
+        row(tt('Serial #', '编号'), data.f_serial),
+        row(tt('Weekly rate', '周租金'), data.f_weekly ? `AUD $${data.f_weekly}` : ''),
+        row(tt('Delivery & collection', '送货/回收费'), data.f_delcol ? `AUD $${data.f_delcol}` : ''),
+      ].join(''));
+      body += section(tt('Charges / Card', '费用 / 信用卡'), [
+        row(tt('Initial charge', '初始费用'), data.initial ? `AUD $${data.initial}` : ''),
+        row(tt('Ongoing weekly', '后续周租'), data.ongoing ? `AUD $${data.ongoing}` : ''),
+        row(tt('Name on card', '持卡人'), data.card_name),
+        row(tt('Card number', '卡号'), data.card_no ? '**** **** **** ' + String(data.card_no).slice(-4) : ''),
+        row(tt('Expiry', '有效期'), data.card_exp),
+      ].join(''));
+      body += section(tt('Execution', '签署'), [
+        row(tt('Full name', '全名'), data.full_name),
+        row(tt('Position', '职位'), data.position),
+      ].join(''));
     }
 
     const title = t(kind === 'dispatch' ? 'Dispatch Report' : 'Forklift Rental Agreement',
@@ -308,36 +300,40 @@ window.SigningPDF = {
 
     const html = `
 <div id="djj-pdf-page" style="
-  width: 800px; padding: 56px 56px 64px; background: #fff; color: #111;
-  font-family: ${fontStack}; font-size: 13px; line-height: 1.5;
+  width: 800px; padding: 38px 42px 40px; background: #fff; color: #111;
+  font-family: ${fontStack}; font-size: 12.5px; line-height: 1.32;
   box-sizing: border-box;">
   <style>
     #djj-pdf-page .hdr { display:flex; justify-content:space-between; align-items:flex-start;
-      border-bottom: 2px solid #111; padding-bottom: 12px; }
-    #djj-pdf-page .hdr img { height: 34px; display: block; }
-    #djj-pdf-page .hdr .corp { text-align:right; font-size:10px; color:#777; line-height:1.5; }
-    #djj-pdf-page h1 { font-size: 22px; font-weight: 700; margin: 14px 0 0; letter-spacing: -0.2px; }
-    #djj-pdf-page .docno { font-family: 'JetBrains Mono', monospace; font-size: 10px; color:#888; margin-top: 4px; }
+      border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 10px; }
+    #djj-pdf-page .hdr img { height: 30px; display: block; }
+    #djj-pdf-page .hdr .corp { text-align:right; font-size:9.5px; color:#777; line-height:1.35; }
+    #djj-pdf-page h1 { font-size: 20px; font-weight: 700; margin: 10px 0 0; letter-spacing: -0.2px; }
+    #djj-pdf-page .docno { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color:#888; margin-top: 3px; }
+    #djj-pdf-page .pdf-section { break-inside: avoid; page-break-inside: avoid; margin-top: 8px; }
     #djj-pdf-page .sec {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .8px;
-      color:#666; text-transform: uppercase; padding: 16px 0 6px;
-      border-top: 1px solid #ddd; margin-top: 12px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .55px;
+      color:#666; text-transform: uppercase; padding: 6px 0 5px;
+      border-top: 1px solid #ddd;
     }
-    #djj-pdf-page .row {
-      display: grid; grid-template-columns: 200px 1fr; gap: 14px;
-      padding: 7px 0; border-bottom: 1px solid #eee; align-items: baseline;
+    #djj-pdf-page .pdf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+    #djj-pdf-page .field {
+      min-height: 30px; padding-bottom: 5px; border-bottom: 1px solid #eee;
+      display: grid; grid-template-columns: 106px 1fr; gap: 8px; align-items: baseline;
+      break-inside: avoid; page-break-inside: avoid;
     }
-    #djj-pdf-page .lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; color:#888; }
-    #djj-pdf-page .val { font-size: 13px; color:#111; word-break: break-word; }
-    #djj-pdf-page .block { font-size: 13px; padding: 4px 0 8px; white-space: pre-wrap; min-height: 32px; }
+    #djj-pdf-page .field.wide { grid-column: 1 / -1; }
+    #djj-pdf-page .lbl { font-family: 'JetBrains Mono', monospace; font-size: 8.8px; color:#888; line-height: 1.25; }
+    #djj-pdf-page .val { font-size: 12.2px; color:#111; word-break: break-word; white-space: pre-wrap; }
     #djj-pdf-page .sigbox {
-      border: 1px solid #111; height: 140px; background: #fff;
+      border: 1px solid #111; height: 104px; background: #fff;
       display:flex; align-items:center; justify-content:center; padding: 8px;
+      break-inside: avoid; page-break-inside: avoid;
     }
-    #djj-pdf-page .sigbox img { max-height: 124px; max-width: 100%; display: block; }
+    #djj-pdf-page .sigbox img { max-height: 88px; max-width: 100%; display: block; }
     #djj-pdf-page .sigfoot {
       display: flex; justify-content: space-between;
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #777; margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #777; margin-top: 5px;
     }
   </style>
   <div class="hdr">
@@ -351,7 +347,7 @@ window.SigningPDF = {
     </div>
   </div>
   ${body}
-  <div class="sec" style="margin-top:20px;">${esc(sigLabel)}</div>
+  <div class="sec" style="margin-top:10px;">${esc(sigLabel)}</div>
   <div class="sigbox">${sigImg ? `<img src="${sigImg}" alt="signature"/>` : ''}</div>
   <div class="sigfoot">
     <span>${esc(stamp)}</span>
@@ -384,26 +380,18 @@ window.SigningPDF = {
     });
     host.remove();
 
-    // Build A4 PDF — slice canvas into A4 pages if taller than one page
+    // Build a single-page A4 PDF. Scale the composed page down only if needed.
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
     const PAGE_W = doc.internal.pageSize.getWidth();   // 595.28
     const PAGE_H = doc.internal.pageSize.getHeight();  // 841.89
-    const imgW = PAGE_W;
-    const ratio = canvas.width / imgW;                  // px per pt
-    const pagePxH = Math.floor(PAGE_H * ratio);
-    let drawnPx = 0;
-    const fullH = canvas.height;
-    while (drawnPx < fullH) {
-      const sliceH = Math.min(pagePxH, fullH - drawnPx);
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width; slice.height = sliceH;
-      slice.getContext('2d').drawImage(canvas, 0, drawnPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const imgData = slice.toDataURL('image/jpeg', 0.92);
-      if (drawnPx > 0) doc.addPage();
-      doc.addImage(imgData, 'JPEG', 0, 0, imgW, sliceH / ratio);
-      drawnPx += sliceH;
-    }
+    const fit = Math.min(PAGE_W / canvas.width, PAGE_H / canvas.height);
+    const imgW = canvas.width * fit;
+    const imgH = canvas.height * fit;
+    const x = (PAGE_W - imgW) / 2;
+    const y = (PAGE_H - imgH) / 2;
+    const imgData = canvas.toDataURL('image/png');
+    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
     doc.save(fname);
 
     try {

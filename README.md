@@ -21,3 +21,10 @@ python -m http.server 8000
 ```
 
 The site depends on CDN-hosted React, Babel, jsPDF, html2canvas, and Google Fonts.
+
+## Integrations
+
+- URL prefill: pass form values as query parameters, for example `?driver=...&rego=...`.
+- Lark/email host fill: call `window.LarkFill({...})` from the embedding host.
+- `postMessage` fill: send `{ type: 'lark:fill', payload: {...} }` to the app frame.
+- After signing, the app downloads the PDF locally and posts `{ type: 'signed', kind, filename, fields }` to the host window when embedded.
