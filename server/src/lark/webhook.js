@@ -69,6 +69,12 @@ router.post('/card-action', async (c) => {
     return c.json({ toast: { type: 'error', content: 'Invalid request' } });
   }
 
+  // 飞书验证 Card Request URL 时发送 challenge，必须原样返回
+  // Lark sends a challenge when verifying the Card Request URL — echo it back
+  if (body.challenge) {
+    return c.json({ challenge: body.challenge });
+  }
+
   const ctx = c.executionCtx;
   if (ctx?.waitUntil) {
     ctx.waitUntil(handleCardAction(env, body));
