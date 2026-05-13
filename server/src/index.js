@@ -6,7 +6,7 @@ import { cors } from 'hono/cors';
 
 import larkRouter from './lark/webhook.js';
 import { sendSignedPDF } from './delivery/mailer.js';
-import { sendMessage } from './lark/client.js';
+import { sendMessage, sendCard } from './lark/client.js';
 import { sendPDFToLark } from './lark/sendFile.js';
 import { uploadPDFToDrive } from './lark/driveUpload.js';
 import { sendSignedCard } from './lark/signedCard.js';
@@ -106,6 +106,81 @@ app.post('/signed', async (c) => {
     return c.json({ ok: false, error: err.message }, 500);
   }
 });
+
+// POST /request-sig-card
+// Called by the frontend when a rental form opens but the user has no registered signature.
+// Sends a Lark card with a registration link. Rate-limited to once per 10 minutes per user.
+app.post('/request-sig-card', async (c) => {
+  const env = c.env;
+  let body;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: 'Invalid JSON' }, 400); }
+  const { open_id } = body;
+  if (!open_id) return c.json({ ok: false, error: 'Missing open_id' }, 400);
+
+  try {
+    if (env.SIG_KV) {
+      const cooldown = await env.SIG_KV.get(`sig_req:${open_id}`);
+      if (cooldown) return c.json({ ok: true, sent: false, reason: 'cooldown' });
+    }
+    const base = env.SIGNING_BASE_URL || 'https://bw1n9s.github.io/djj-signing-platform/app/index.html';
+    const regUrl = `${base}?open_id=${encodeURIComponent(open_id)}#/register-sig`;
+    await sendCard(env, open_id, buildSigRequestCard(regUrl));
+    if (env.SIG_KV) await env.SIG_KV.put(`sig_req:${open_id}`, '1', { expirationTtl: 600 });
+    return c.json({ ok: true, sent: true });
+  } catch (err) {
+    console.error('[/request-sig-card]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// POST /save-sig
+// Called by the #/register-sig page to store a user's personal signature in KV.
+app.post('/save-sig', async (c) => {
+  const env = c.env;
+  let body;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: 'Invalid JSON' }, 400); }
+  const { open_id, dataUrl, name } = body;
+  if (!open_id || !dataUrl || !name) return c.json({ ok: false, error: 'Missing fields' }, 400);
+  if (!env.SIG_KV) return c.json({ ok: false, error: 'SIG_KV not configured' }, 503);
+
+  try {
+    await env.SIG_KV.put(`sig:${open_id}`, JSON.stringify({ dataUrl, name, savedAt: Date.now() }));
+    await env.SIG_KV.delete(`sig_req:${open_id}`);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[/save-sig]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+function buildSigRequestCard(regUrl) {
+  return {
+    config: { wide_screen_mode: true },
+    header: {
+      title: { tag: 'plain_text', content: '✍️ 请注册您的签名 · Register Your Signature' },
+      template: 'blue',
+    },
+    elements: [
+      {
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content: '您打开了一份租赁协议，但尚未注册个人签名。\n请点击下方按钮完成注册，之后可在表单上一键自动签署。\n\nYou opened a Rental Agreement without a registered signature.\nTap below to register — then you can auto-sign forms with one tap.',
+        },
+      },
+      { tag: 'hr' },
+      {
+        tag: 'action',
+        actions: [{
+          tag: 'button',
+          text: { tag: 'plain_text', content: '✍️ 注册签名 · Register Signature' },
+          type: 'primary',
+          url: regUrl,
+        }],
+      },
+    ],
+  };
+}
 
 // GET /user-sig?open_id=xxx
 // Returns the stored personal signature for a user (set by sending an image to the bot)

@@ -526,7 +526,7 @@ function App() {
   // Routes: 'home' | 'delivery' | 'dispatch' | 'rental' | 'done'
   const initialRoute = () => {
     const h = (window.location.hash || '').replace(/^#\/?/, '');
-    return ['home','delivery','dispatch','rental','done'].includes(h) ? h : 'home';
+    return ['home','delivery','dispatch','rental','done','register-sig'].includes(h) ? h : 'home';
   };
   const [route, setRoute] = useState(initialRoute);
   const [lang, setLang] = useState(() => {
@@ -554,7 +554,8 @@ function App() {
   if (route === 'delivery') return <window.DeliveryOrderForm lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
   if (route === 'dispatch') return <window.DispatchForm lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
   if (route === 'rental')   return <window.RentalForm   lang={lang} setLang={setLang} goHome={goHome} onDone={onDone} />;
-  if (route === 'done')     return <Done lang={lang} payload={donePayload} restart={() => setRoute(donePayload?.kind || 'home')} goHome={goHome} />;
+  if (route === 'done')         return <Done lang={lang} payload={donePayload} restart={() => setRoute(donePayload?.kind || 'home')} goHome={goHome} />;
+  if (route === 'register-sig') return <window.RegisterSig lang={lang} setLang={setLang} goHome={goHome} />;
   return <Home lang={lang} setLang={setLang} go={go} />;
 }
 

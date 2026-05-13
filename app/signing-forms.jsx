@@ -850,7 +850,8 @@ function makeForm(kind) {
     const lessorSigRef = useRef(null);
     const [lessorSigEmpty, setLessorSigEmpty] = useState(true);
     const [lessorAutoSigned, setLessorAutoSigned] = useState(false);
-    const [userSig, setUserSig] = useState(null); // { name, dataUrl } — fetched from Worker
+    const [userSig, setUserSig] = useState(null);     // { name, dataUrl } — fetched from Worker
+    const [sigPending, setSigPending] = useState(false); // true while waiting for user to register
     const [err, setErr] = useState('');
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
@@ -891,10 +892,37 @@ function makeForm(kind) {
     useEffect(() => {
       const open_id = new URLSearchParams(window.location.search).get('open_id');
       if (!open_id || !window.WORKER_BASE) return;
-      fetch(`${window.WORKER_BASE}/user-sig?open_id=${encodeURIComponent(open_id)}`)
-        .then(r => r.json())
-        .then(j => { if (j.found) setUserSig({ name: j.name, dataUrl: j.dataUrl }); })
-        .catch(() => {});
+      let poll = null;
+
+      const check = () =>
+        fetch(`${window.WORKER_BASE}/user-sig?open_id=${encodeURIComponent(open_id)}`)
+          .then(r => r.json())
+          .then(j => {
+            if (j.found) {
+              setUserSig({ name: j.name, dataUrl: j.dataUrl });
+              setSigPending(false);
+              if (poll) { clearInterval(poll); poll = null; }
+            }
+          })
+          .catch(() => {});
+
+      check().then(() => {
+        // If still no sig and this is a rental form, ask the user to register
+        setUserSig(prev => {
+          if (!prev && kind === 'rental') {
+            setSigPending(true);
+            fetch(`${window.WORKER_BASE}/request-sig-card`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ open_id }),
+            }).catch(() => {});
+            poll = setInterval(check, 4000);
+          }
+          return prev;
+        });
+      });
+
+      return () => { if (poll) clearInterval(poll); };
     }, []);
 
     const submit = async () => {
@@ -1009,6 +1037,7 @@ function makeForm(kind) {
               borderRadius: 4, padding: '6px 12px', fontSize: 12, color: 'var(--ink-2)',
             }}>{t.clear}</button>
           <button type="button"
+            disabled={sigPending && !userSig}
             onClick={() => {
               const c = lessorSigRef.current;
               if (!c) return;
@@ -1038,14 +1067,17 @@ function makeForm(kind) {
               setLessorAutoSigned(true);
             }}
             style={{
-              background: 'var(--ink)', color: '#fff',
+              background: (sigPending && !userSig) ? '#aaa' : 'var(--ink)', color: '#fff',
               border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12,
+              cursor: (sigPending && !userSig) ? 'not-allowed' : 'pointer',
             }}>
             {lessorAutoSigned
               ? `✓ ${t.autoSigned}`
               : userSig
                 ? (lang === 'zh' ? `自动签署 (${userSig.name})` : `Auto-sign (${userSig.name})`)
-                : t.autoSign}
+                : sigPending
+                  ? (lang === 'zh' ? '待注册签名…' : 'Awaiting signature…')
+                  : t.autoSign}
           </button>
         </div>
       </div>
@@ -1113,3 +1145,124 @@ function makeForm(kind) {
 window.DeliveryOrderForm = makeForm('delivery');
 window.DispatchForm = makeForm('dispatch');
 window.RentalForm   = makeForm('rental');
+
+// ─── Signature Registration Page (#/register-sig) ────────────────────────
+function RegisterSig({ lang, setLang, goHome }) {
+  const [name, setName] = useState('');
+  const [sigEmpty, setSigEmpty] = useState(true);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'busy' | 'done' | 'error'
+  const [errMsg, setErrMsg] = useState('');
+  const sigRef = useRef(null);
+  const open_id = new URLSearchParams(window.location.search).get('open_id');
+
+  const submit = async () => {
+    if (!name.trim()) { setErrMsg(lang === 'zh' ? '请输入您的姓名。' : 'Please enter your name.'); return; }
+    if (!sigRef.current || sigRef.current.isEmpty?.()) { setErrMsg(lang === 'zh' ? '请先签名。' : 'Please sign first.'); return; }
+    if (!open_id) { setErrMsg(lang === 'zh' ? '缺少用户 ID，请通过飞书卡片链接打开此页面。' : 'Missing user ID — please open via the Lark card link.'); return; }
+    setStatus('busy'); setErrMsg('');
+    try {
+      const dataUrl = sigRef.current.toDataURL();
+      const resp = await fetch(`${window.WORKER_BASE}/save-sig`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ open_id, dataUrl, name: name.trim() }),
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || 'Save failed');
+      setStatus('done');
+    } catch (err) {
+      setErrMsg(err.message);
+      setStatus('idle');
+    }
+  };
+
+  if (status === 'done') {
+    return (
+      <window.AppShell
+        title={lang === 'zh' ? '签名已注册' : 'Signature Registered'}
+        lang={lang} setLang={setLang} goHome={goHome} footer={null}
+      >
+        <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: 999, background: 'var(--ok)',
+            color: '#fff', margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, fontWeight: 700,
+          }}>✓</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>
+            {lang === 'zh' ? `签名已保存，${name}` : `Signature saved, ${name}`}
+          </div>
+          <div style={{ color: 'var(--muted)', marginTop: 8, fontSize: 14, lineHeight: 1.5 }}>
+            {lang === 'zh'
+              ? '请返回签署表单，自动签署按钮现在会使用您的个人签名。'
+              : 'Go back to the signing form — the auto-sign button will now use your personal signature.'}
+          </div>
+        </div>
+      </window.AppShell>
+    );
+  }
+
+  return (
+    <window.AppShell
+      title={lang === 'zh' ? '注册个人签名' : 'Register Your Signature'}
+      lang={lang} setLang={setLang} goHome={goHome}
+      footer={
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {errMsg && <span style={{ color: 'var(--required)', fontSize: 13 }}>{errMsg}</span>}
+          <button type="button" onClick={submit}
+            disabled={status === 'busy' || sigEmpty || !name.trim()}
+            style={{
+              minHeight: 48, background: 'var(--ink)', color: '#fff',
+              border: 'none', borderRadius: 6, fontSize: 16, fontWeight: 600,
+              opacity: (status === 'busy' || sigEmpty || !name.trim()) ? 0.5 : 1,
+            }}>
+            {status === 'busy' ? '…' : lang === 'zh' ? '保存签名' : 'Save Signature'}
+          </button>
+        </div>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {!open_id && (
+          <div style={{ padding: 12, background: '#fff3cd', borderRadius: 6, fontSize: 13, color: '#856404' }}>
+            {lang === 'zh'
+              ? '请通过飞书机器人卡片的链接打开此页面。'
+              : 'Please open this page via the Lark bot card link.'}
+          </div>
+        )}
+        <div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            {lang === 'zh' ? '您的姓名（显示在签署按钮上）' : 'Your name (shown on the auto-sign button)'}
+          </div>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder={lang === 'zh' ? '请输入您的姓名…' : 'Enter your name…'}
+            style={{
+              width: '100%', minHeight: 44, padding: '10px 12px',
+              background: '#fff', border: '1px solid var(--rule)',
+              borderRadius: 6, fontSize: 16, outline: 'none',
+            }}
+          />
+        </div>
+        <div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            {lang === 'zh' ? '您的签名' : 'Your signature'}
+          </div>
+          <window.SigPad ref={sigRef} height={200} lang={lang}
+            label="SIGNATURE" zhLabel="签名"
+            onChange={empty => setSigEmpty(empty)}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+            <button type="button" onClick={() => sigRef.current?.clear?.()}
+              style={{
+                background: 'transparent', border: '1px solid var(--rule)',
+                borderRadius: 4, padding: '6px 12px', fontSize: 12, color: 'var(--ink-2)',
+              }}>{lang === 'zh' ? '清除' : 'Clear'}</button>
+          </div>
+        </div>
+      </div>
+    </window.AppShell>
+  );
+}
+window.RegisterSig = RegisterSig;
