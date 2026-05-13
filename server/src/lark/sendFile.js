@@ -1,6 +1,6 @@
 import { getTenantAccessToken } from './client.js';
 
-const LARK_BASE = 'https://open.feishu.cn/open-apis';
+const LARK_BASE = 'https://open.larksuite.com/open-apis';
 
 export async function sendPDFToLark(env, { open_id, pdfBase64, filename, caption }) {
   const token = await getTenantAccessToken(env);

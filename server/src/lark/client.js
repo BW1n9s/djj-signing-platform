@@ -3,7 +3,7 @@
 // Uses the global fetch API — no third-party dependencies
 'use strict';
 
-const LARK_BASE = 'https://open.feishu.cn/open-apis';
+const LARK_BASE = 'https://open.larksuite.com/open-apis';
 
 // 模块级 token 缓存（同一 Worker 实例内有效，跨实例不共享）
 // Module-level token cache — persists within one Worker instance only

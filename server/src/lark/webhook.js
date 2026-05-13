@@ -151,41 +151,47 @@ async function handleEvent(env, body) {
       return;
     }
 
-    const isDeliveryTrigger = /delivery|送货|order|签字|picking|booking|confirmation/i.test(text);
-    if (!isDeliveryTrigger) {
-      await sendMessage(env, open_id, HELP_TEXT);
+    const isDeliveryTrigger = /delivery|送货|picking|booking|confirmation/i.test(text);
+    const isRentalTrigger   = /rental|hire|rent|叉车|租赁|协议/i.test(text);
+
+    if (isRentalTrigger) {
+      await handleRentalTrigger(env, open_id);
       return;
     }
 
-    await sendMessage(env, open_id, '正在搜索邮件，请稍候…\nSearching emails, please wait…');
+    if (isDeliveryTrigger) {
+      await sendMessage(env, open_id, '正在搜索邮件，请稍候…\nSearching emails, please wait…');
 
-    let emails;
-    try {
-      emails = await searchDeliveryEmails(env);
-    } catch (err) {
-      console.error('[handleEvent] Gmail search error:', err.message);
-      await sendMessage(env, open_id,
-        `❌ Gmail 搜索失败：${err.message}\n请检查 Gmail OAuth2 配置是否正确。`
-      );
-      return;
+      let emails;
+      try {
+        emails = await searchDeliveryEmails(env);
+      } catch (err) {
+        console.error('[handleEvent] Gmail search error:', err.message);
+        await sendMessage(env, open_id,
+          `❌ Gmail 搜索失败：${err.message}\n请检查 Gmail OAuth2 配置是否正确。`
+        );
+        return;
+      }
+
+      if (!emails || emails.length === 0) {
+        await sendMessage(env, open_id,
+          '未找到最近 30 天内的送货相关邮件。\nNo delivery emails found in the last 30 days.'
+        );
+        return;
+      }
+
+      if (emails.length === 1) {
+        await processSelectedEmail(env, open_id, emails[0]);
+        return;
+      }
+
+      // 多封邮件：发送选择卡片（最多 5 封）/ Multiple emails: send selection card (up to 5)
+      const topEmails = emails.slice(0, 5);
+      pendingSelections.set(open_id, { emails: topEmails, createdAt: Date.now() });
+      await sendCard(env, open_id, buildSelectionCard(topEmails));
+    } else {
+      await sendCard(env, open_id, buildStartCard(env.SIGNING_BASE_URL, open_id));
     }
-
-    if (!emails || emails.length === 0) {
-      await sendMessage(env, open_id,
-        '未找到最近 30 天内的送货相关邮件。\nNo delivery emails found in the last 30 days.'
-      );
-      return;
-    }
-
-    if (emails.length === 1) {
-      await processSelectedEmail(env, open_id, emails[0]);
-      return;
-    }
-
-    // 多封邮件：发送选择卡片（最多 5 封）/ Multiple emails: send selection card (up to 5)
-    const topEmails = emails.slice(0, 5);
-    pendingSelections.set(open_id, { emails: topEmails, createdAt: Date.now() });
-    await sendCard(env, open_id, buildSelectionCard(topEmails));
   } catch (err) {
     console.error('[handleEvent]', err.message);
   }
@@ -258,12 +264,55 @@ function buildSelectionCard(emails) {
   };
 }
 
-const HELP_TEXT = `你好！我可以帮你搜索送货订单并生成司机签字链接。
+async function handleRentalTrigger(env, open_id) {
+  await sendCard(env, open_id, buildStartCard(env.SIGNING_BASE_URL, open_id));
+}
 
-发送包含以下关键词的消息即可触发 / Send a message with any of these keywords:
-• delivery / 送货
-• order / 订单
-• 签字
-• picking / booking / confirmation`;
+function buildStartCard(signingBaseUrl, open_id) {
+  const base = signingBaseUrl ||
+    'https://bw1n9s.github.io/djj-signing-platform/app/index.html';
+  const q = `?open_id=${encodeURIComponent(open_id)}`;
+
+  return {
+    config: { wide_screen_mode: true },
+    header: {
+      title: { tag: 'plain_text', content: 'DJJ Signing Platform' },
+      template: 'blue',
+    },
+    elements: [
+      {
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content: '请选择需要签署的文件类型\nSelect the document type to sign',
+        },
+      },
+      { tag: 'hr' },
+      {
+        tag: 'action',
+        actions: [
+          {
+            tag: 'button',
+            text: { tag: 'plain_text', content: '📦 送货签收单 · Delivery Order' },
+            type: 'primary',
+            url: `${base}${q}#/delivery`,
+          },
+          {
+            tag: 'button',
+            text: { tag: 'plain_text', content: '🚛 发货报告 · Dispatch Report' },
+            type: 'default',
+            url: `${base}${q}#/dispatch`,
+          },
+          {
+            tag: 'button',
+            text: { tag: 'plain_text', content: '🏗 叉车租赁协议 · Rental Agreement' },
+            type: 'default',
+            url: `${base}${q}#/rental`,
+          },
+        ],
+      },
+    ],
+  };
+}
 
 export default router;
