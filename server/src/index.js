@@ -107,6 +107,22 @@ app.post('/signed', async (c) => {
   }
 });
 
+// GET /user-sig?open_id=xxx
+// Returns the stored personal signature for a user (set by sending an image to the bot)
+app.get('/user-sig', async (c) => {
+  const open_id = c.req.query('open_id');
+  if (!open_id) return c.json({ ok: false, error: 'Missing open_id' }, 400);
+  if (!c.env.SIG_KV) return c.json({ ok: true, found: false });
+  try {
+    const sig = await c.env.SIG_KV.get(`sig:${open_id}`, 'json');
+    if (!sig) return c.json({ ok: true, found: false });
+    return c.json({ ok: true, found: true, name: sig.name, dataUrl: sig.dataUrl });
+  } catch (err) {
+    console.error('[/user-sig]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // 健康检查 / Health check
 app.get('/health', (c) => c.json({ ok: true, ts: new Date().toISOString() }));
 

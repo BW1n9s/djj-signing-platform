@@ -850,6 +850,7 @@ function makeForm(kind) {
     const lessorSigRef = useRef(null);
     const [lessorSigEmpty, setLessorSigEmpty] = useState(true);
     const [lessorAutoSigned, setLessorAutoSigned] = useState(false);
+    const [userSig, setUserSig] = useState(null); // { name, dataUrl } — fetched from Worker
     const [err, setErr] = useState('');
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
@@ -886,6 +887,15 @@ function makeForm(kind) {
       };
       return () => { delete window.DJJAutoSign; };
     }, [kind]);
+
+    useEffect(() => {
+      const open_id = new URLSearchParams(window.location.search).get('open_id');
+      if (!open_id || !window.WORKER_BASE) return;
+      fetch(`${window.WORKER_BASE}/user-sig?open_id=${encodeURIComponent(open_id)}`)
+        .then(r => r.json())
+        .then(j => { if (j.found) setUserSig({ name: j.name, dataUrl: j.dataUrl }); })
+        .catch(() => {});
+    }, []);
 
     const submit = async () => {
       if (kind === 'delivery' && (!data.driver_name || !data.driver_phone || !data.vehicle_rego)) {
@@ -1002,23 +1012,27 @@ function makeForm(kind) {
             onClick={() => {
               const c = lessorSigRef.current;
               if (!c) return;
-              const canvas = document.createElement('canvas');
-              canvas.width = 400; canvas.height = 160;
-              const ctx = canvas.getContext('2d');
-              ctx.fillStyle = '#fff';
-              ctx.fillRect(0, 0, 400, 160);
-              ctx.strokeStyle = '#0d1b2a';
-              ctx.lineWidth = 2;
-              ctx.font = 'italic bold 28px Georgia, serif';
-              ctx.fillStyle = '#0d1b2a';
-              ctx.fillText('DJJ Equipment', 30, 80);
-              ctx.font = '13px monospace';
-              ctx.fillStyle = '#666';
-              ctx.fillText('Authorised Signatory', 30, 108);
-              if (c.drawDataURL) {
-                c.drawDataURL(canvas.toDataURL());
+              if (userSig?.dataUrl) {
+                if (c.drawDataURL) c.drawDataURL(userSig.dataUrl);
               } else {
-                window.__djjLessorAutoSigData = canvas.toDataURL();
+                const canvas = document.createElement('canvas');
+                canvas.width = 400; canvas.height = 160;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, 400, 160);
+                ctx.strokeStyle = '#0d1b2a';
+                ctx.lineWidth = 2;
+                ctx.font = 'italic bold 28px Georgia, serif';
+                ctx.fillStyle = '#0d1b2a';
+                ctx.fillText('DJJ Equipment', 30, 80);
+                ctx.font = '13px monospace';
+                ctx.fillStyle = '#666';
+                ctx.fillText('Authorised Signatory', 30, 108);
+                if (c.drawDataURL) {
+                  c.drawDataURL(canvas.toDataURL());
+                } else {
+                  window.__djjLessorAutoSigData = canvas.toDataURL();
+                }
               }
               setLessorSigEmpty(false);
               setLessorAutoSigned(true);
@@ -1027,7 +1041,11 @@ function makeForm(kind) {
               background: 'var(--ink)', color: '#fff',
               border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12,
             }}>
-            {lessorAutoSigned ? `✓ ${t.autoSigned}` : t.autoSign}
+            {lessorAutoSigned
+              ? `✓ ${t.autoSigned}`
+              : userSig
+                ? (lang === 'zh' ? `自动签署 (${userSig.name})` : `Auto-sign (${userSig.name})`)
+                : t.autoSign}
           </button>
         </div>
       </div>

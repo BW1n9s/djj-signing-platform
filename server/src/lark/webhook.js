@@ -2,7 +2,7 @@
 // POST /lark/webhook      — 事件接收 + URL 验证
 // POST /lark/card-action  — 卡片按钮点击回调
 import { Hono } from 'hono';
-import { sendMessage, sendCard } from './client.js';
+import { sendMessage, sendCard, getTenantAccessToken } from './client.js';
 import { searchDeliveryEmails, parseEmailToDeliveryData } from '../gmail/search.js';
 import { buildDriverSigningUrl } from '../delivery/buildLink.js';
 
@@ -14,6 +14,9 @@ const router = new Hono();
 // Note: not shared across Worker instances; use KV/Durable Objects for production HA
 const pendingSelections = new Map();
 const SELECTION_TTL = 30 * 60_000; // 30 分钟 / 30 minutes
+
+const pendingSigs = new Map(); // open_id → { dataUrl, expiresAt }
+const SIG_TTL = 5 * 60_000;   // 5 minutes to reply with name
 
 // POST /lark/webhook
 // 飞书要求：必须立即返回 200，否则会重试推送
@@ -144,6 +147,13 @@ async function handleEvent(env, body) {
     // 只处理私聊消息 / Only handle direct (p2p) messages
     if (message.chat_type !== 'p2p') return;
 
+    // ── Image message → signature registration ──────────────────────────────
+    if (message.msg_type === 'image') {
+      await handleImageMessage(env, open_id, message);
+      return;
+    }
+
+    // ── Text message ────────────────────────────────────────────────────────
     let text = '';
     try {
       text = JSON.parse(message.content)?.text ?? '';
@@ -151,6 +161,34 @@ async function handleEvent(env, body) {
       return;
     }
 
+    // If user previously sent a signature image, they're now providing their name
+    const pendingSig = pendingSigs.get(open_id);
+    if (pendingSig) {
+      if (Date.now() < pendingSig.expiresAt) {
+        const name = text.trim();
+        if (name) {
+          pendingSigs.delete(open_id);
+          if (env.SIG_KV) {
+            await env.SIG_KV.put(
+              `sig:${open_id}`,
+              JSON.stringify({ dataUrl: pendingSig.dataUrl, name, savedAt: Date.now() })
+            );
+            await sendMessage(env, open_id,
+              `✅ 签名已保存为「${name}」。\n下次打开租赁协议时，"自动签署 (${name})" 按钮将使用您的个人签名。\n\n✅ Signature saved as "${name}".\nNext time you open a Rental Agreement the "Auto-sign (${name})" button will use your personal signature.`
+            );
+          } else {
+            await sendMessage(env, open_id,
+              '❌ 签名存储尚未配置，请联系管理员设置 KV 存储。\n❌ Signature storage not configured — ask an admin to set up KV.'
+            );
+          }
+          return;
+        }
+      } else {
+        pendingSigs.delete(open_id);
+      }
+    }
+
+    // ── Normal keyword routing ───────────────────────────────────────────────
     const isDeliveryTrigger = /delivery|送货|picking|booking|confirmation/i.test(text);
     const isRentalTrigger   = /rental|hire|rent|叉车|租赁|协议/i.test(text);
 
@@ -313,6 +351,41 @@ function buildStartCard(signingBaseUrl, open_id) {
       },
     ],
   };
+}
+
+async function handleImageMessage(env, open_id, message) {
+  try {
+    let imageKey;
+    try { imageKey = JSON.parse(message.content)?.image_key; } catch {}
+    if (!imageKey) {
+      await sendMessage(env, open_id, '无法读取图片，请重试。\nCould not read the image, please try again.');
+      return;
+    }
+
+    const token = await getTenantAccessToken(env);
+    const resp = await fetch(
+      `https://open.larksuite.com/open-apis/im/v1/messages/${message.message_id}/resources/${imageKey}?type=image`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!resp.ok) throw new Error(`Image download HTTP ${resp.status}`);
+
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const base64 = btoa(binary);
+    const contentType = resp.headers.get('content-type') || 'image/png';
+    const dataUrl = `data:${contentType};base64,${base64}`;
+
+    pendingSigs.set(open_id, { dataUrl, expiresAt: Date.now() + SIG_TTL });
+
+    await sendMessage(env, open_id,
+      '已收到您的签名图片 ✓\n请回复您的姓名（将显示在签署按钮上）。\n\nGot your signature image ✓\nPlease reply with your name — it will appear on the auto-sign button.'
+    );
+  } catch (err) {
+    console.error('[handleImageMessage]', err.message);
+    await sendMessage(env, open_id, `❌ 处理图片失败：${err.message}\nFailed to process image.`);
+  }
 }
 
 export default router;

@@ -17,6 +17,14 @@ GMAIL_USER       = "anita@djjequipment.com.au"
 # GMAIL_CLIENT_SECRET
 # GMAIL_REFRESH_TOKEN
 
+# KV namespace for per-user signature storage.
+# Run once, then paste the id below:
+#   cd server && npx wrangler kv namespace create SIG_KV
+# Then uncomment:
+# [[kv_namespaces]]
+# binding = "SIG_KV"
+# id = "PASTE_ID_HERE"
+
 [observability.logs]
 enabled = true
 invocation_logs = true
