@@ -155,13 +155,6 @@ function Label({ en, zh, lang, required, prefilled }) {
         {lang === 'zh' ? (zh || en) : en}
         {required && <span style={{ color: 'var(--required)', marginLeft: 4 }}>*</span>}
       </span>
-      {prefilled && (
-        <span style={{
-          color: '#7a661f', background: 'var(--pre)',
-          padding: '0 5px', borderRadius: 2, fontSize: 9,
-          border: '1px solid var(--pre-edge)',
-        }}>{T[lang].larkPrefilled}</span>
-      )}
     </div>
   );
 }
@@ -181,8 +174,8 @@ function Field({ name, en, zh, lang, value, onChange, prefilled, required, place
           placeholder={placeholder || (lang === 'zh' ? '请输入…' : 'Enter…')}
           style={{
             width: '100%', minHeight: 44, padding: '10px 12px',
-            background: prefilled ? 'var(--pre)' : '#fff',
-            border: '1px solid ' + (prefilled ? 'var(--pre-edge)' : 'var(--rule)'),
+            background: '#fff',
+            border: '1px solid var(--rule)',
             borderRadius: 6, fontSize: 15, outline: 'none',
             paddingRight: suffix ? 38 : 12,
           }}
@@ -303,20 +296,19 @@ function EquipmentRows({ rows, lang, onChange }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[
-              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc },
-              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category },
-              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin },
-              { key: 'f_weekly',   en: t.fields.f_weekly,   zh: T.zh.fields.f_weekly,   suffix: 'AUD' },
-              { key: 'f_delcol',   en: t.fields.f_delcol,   zh: T.zh.fields.f_delcol,   suffix: 'AUD' },
-              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true },
-            ].map(({ key, en, zh, suffix, wide }) => (
+              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc,     ph: lang === 'zh' ? '例：丰田8FG25平衡重式叉车' : 'e.g. Toyota 8FG25 Counterbalance Forklift' },
+              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category, ph: lang === 'zh' ? '例：平衡重 / 步行式 / 高位拣选' : 'e.g. Counterbalance / Walkie Reach / High Reach' },
+              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin,      ph: 'e.g. TY-8FG25-2208' },
+              { key: 'f_weekly',   en: t.fields.f_weekly,   zh: T.zh.fields.f_weekly,   suffix: 'AUD', ph: '0.00' },
+              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true, ph: lang === 'zh' ? '例：全维护，液化气，2.5T' : 'e.g. Fully maintained, LPG, 2.5T capacity' },
+            ].map(({ key, en, zh, suffix, wide, ph }) => (
               <div key={key} style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
                 <Label en={en} zh={zh} lang={lang} />
                 <div style={{ position: 'relative' }}>
                   <input
                     value={row[key] || ''}
                     onChange={e => update(idx, key, e.target.value)}
-                    placeholder={lang === 'zh' ? '请输入…' : 'Enter…'}
+                    placeholder={ph || (lang === 'zh' ? '请输入…' : 'Enter…')}
                     style={{
                       width: '100%', minHeight: 44, padding: '10px 12px',
                       paddingRight: suffix ? 38 : 12,
@@ -495,42 +487,32 @@ const DEFAULT_DISPATCH = {
 const PREFILLED_DISPATCH_KEYS = ['report_no','date','rego','invoice','driver','phone','serial','model','dispatch_time','supervisor','operator'];
 
 const DEFAULT_RENTAL = {
-  agreement_no: 'DJJ-HIRE-04612S-01',
-  lessee_company: 'ACME Logistics Pty Ltd',
-  lessee_abn: '12 345 678 901',
-  contact_name: 'Sarah Lee',
-  contact_phone: '+61 488 222 333',
-  contact_email: 'sarah@acme.com.au',
-  delivery: '22 Industrial Dr, Wetherill Park NSW 2164',
-  start: '12 May 2026',
-  end: '11 Aug 2026',
+  agreement_no: '',
+  lessee_company: '',
+  lessee_abn: '',
+  contact_name: '',
+  contact_phone: '',
+  contact_email: '',
+  delivery: '',
+  start: '',
+  end: '',
   period_type: 'weekly',
   equipments: [
-    {
-      f_desc: 'Toyota 8FG25 Forklift',
-      f_category: '',
-      f_vin: 'TY-2208',
-      f_weekly: '385.00',
-      f_delcol: '220.00',
-      f_config: '',
-    }
+    { f_desc: '', f_category: '', f_vin: '', f_weekly: '', f_config: '' }
   ],
   bond_per: '1000.00',
   bond_total: '1000.00',
+  delivery_method: 'logistics',
+  delivery_fee: '',
   ongoing_interval: 'weekly',
   ongoing_custom_label: '',
-  ongoing_rate: '385.00',
-  initial: '605.00',
-  full_name: 'Sarah Lee',
-  position: 'Operations Manager',
+  ongoing_rate: '',
+  initial: '',
+  full_name: '',
+  position: '',
   lessor_name: '',
-  lessor_position: '',
+  lessor_position: 'Sales Representative',
 };
-
-const PREFILLED_RENTAL_KEYS = [
-  'agreement_no','lessee_company','lessee_abn','contact_name','contact_phone',
-  'contact_email','delivery','start','end','full_name','position',
-];
 
 // ───────────────────── Doc shells (printable) ──────────────────────────────
 function DeliveryBody({ data, set, lang, sigSlot }) {
@@ -663,7 +645,6 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
   const F = (key, opts = {}) => (
     <Field name={key} en={t.fields[key]} zh={T.zh.fields[key]} lang={lang}
       value={data[key]} onChange={set}
-      prefilled={PREFILLED_RENTAL_KEYS.includes(key) && !!data[key]}
       {...opts}
     />
   );
@@ -713,15 +694,18 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
 
       <SectionHead>{t.section.lessee}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('lessee_company')}{F('lessee_abn')}
-        {F('contact_name')}{F('contact_phone')}
-        {F('contact_email', { wide: true })}
-        {F('delivery', { wide: true })}
+        {F('lessee_company', { placeholder: lang === 'zh' ? '例：澳佳物流有限公司' : 'e.g. Acme Logistics Pty Ltd' })}
+        {F('lessee_abn',     { placeholder: 'e.g. 12 345 678 901' })}
+        {F('contact_name',  { placeholder: lang === 'zh' ? '例：张三' : 'e.g. John Smith' })}
+        {F('contact_phone', { placeholder: 'e.g. +61 400 123 456' })}
+        {F('contact_email', { wide: true, placeholder: 'e.g. contact@company.com.au' })}
+        {F('delivery',      { wide: true, placeholder: lang === 'zh' ? '例：22 Industrial Dr, Wetherill Park NSW 2164' : 'e.g. 22 Industrial Dr, Wetherill Park NSW 2164' })}
       </div>
 
       <SectionHead>{t.section.period}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('start')}{F('end')}
+        {F('start', { placeholder: 'e.g. 12 May 2026' })}
+        {F('end',   { placeholder: 'e.g. 11 Aug 2026' })}
         <SelectField
           name="period_type" labelEn={t.fields.period_type} labelZh={T.zh.fields.period_type}
           options={periodOptions} value={data.period_type} onChg={set}
@@ -737,7 +721,49 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
 
       <SectionHead>{t.section.charges}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('initial', { suffix: 'AUD' })}
+        {/* Delivery method */}
+        <SelectField
+          name="delivery_method"
+          labelEn={lang === 'zh' ? '交付方式' : 'Delivery method'}
+          labelZh="交付方式"
+          options={[
+            { value: 'logistics', label: lang === 'zh' ? '物流配送' : 'Logistics (DJJ delivers)' },
+            { value: 'pickup',    label: lang === 'zh' ? '客户自提' : 'Customer pickup' },
+          ]}
+          value={data.delivery_method}
+          onChg={set}
+        />
+        {data.delivery_method === 'logistics' ? (
+          <div>
+            <Label en="Delivery & collection fee" zh="送货/回收费" lang={lang} />
+            <div style={{ position: 'relative' }}>
+              <input
+                value={data.delivery_fee || ''}
+                onChange={e => set('delivery_fee', e.target.value)}
+                placeholder="0.00"
+                style={{
+                  width: '100%', minHeight: 44, padding: '10px 38px 10px 12px',
+                  background: '#fff', border: '1px solid var(--rule)',
+                  borderRadius: 6, fontSize: 15, outline: 'none',
+                }}
+              />
+              <span style={{
+                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                fontSize: 12, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace',
+              }}>AUD</span>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px dashed var(--rule)', borderRadius: 6, padding: 12,
+            color: 'var(--muted)', fontSize: 13,
+          }}>
+            {lang === 'zh' ? '客户自行提取，无需配送费' : 'No delivery fee — customer pickup'}
+          </div>
+        )}
+
+        {F('initial', { suffix: 'AUD', placeholder: '0.00' })}
 
         {/* Bond per machine */}
         <div>
@@ -788,7 +814,7 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
           name="ongoing_interval" labelEn={t.fields.ongoing_interval} labelZh={T.zh.fields.ongoing_interval}
           options={periodOptions} value={data.ongoing_interval} onChg={set}
         />
-        {F('ongoing_rate', { suffix: 'AUD' })}
+        {F('ongoing_rate', { suffix: 'AUD', placeholder: '0.00' })}
 
         {data.ongoing_interval === 'custom' && (
           <Field name="ongoing_custom_label"
@@ -800,7 +826,8 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
 
       <SectionHead>{t.section.exec}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('full_name')}{F('position')}
+        {F('full_name', { placeholder: lang === 'zh' ? '例：张三' : 'e.g. John Smith' })}
+        {F('position',  { placeholder: lang === 'zh' ? '例：运营经理' : 'e.g. Operations Manager' })}
       </div>
 
       {/* Dual signature block */}
@@ -824,7 +851,8 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
-        {F('lessor_name')}{F('lessor_position')}
+        {F('lessor_name',     { placeholder: 'e.g. Daniel Wu' })}
+        {F('lessor_position', { placeholder: 'Sales Representative' })}
       </div>
     </div>
   );

@@ -322,7 +322,7 @@ function buildStartCard(signingBaseUrl, open_id) {
         tag: 'div',
         text: {
           tag: 'lark_md',
-          content: '请选择需要签署的文件类型\nSelect the document type to sign',
+          content: '点击下方按钮开始签署叉车租赁协议。\nTap the button below to open the Forklift Rental Agreement.',
         },
       },
       { tag: 'hr' },
@@ -331,20 +331,8 @@ function buildStartCard(signingBaseUrl, open_id) {
         actions: [
           {
             tag: 'button',
-            text: { tag: 'plain_text', content: '📦 送货签收单 · Delivery Order' },
-            type: 'primary',
-            url: `${base}${q}#/delivery`,
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '🚛 发货报告 · Dispatch Report' },
-            type: 'default',
-            url: `${base}${q}#/dispatch`,
-          },
-          {
-            tag: 'button',
             text: { tag: 'plain_text', content: '🏗 叉车租赁协议 · Rental Agreement' },
-            type: 'default',
+            type: 'primary',
             url: `${base}${q}#/rental`,
           },
         ],
