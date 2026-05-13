@@ -68,6 +68,13 @@
 </template>
 <div id="root"></div>
 
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+</script>
 <script type="text/babel" src="sig-pad.jsx"></script>
 <script type="text/babel" src="signing-forms.jsx"></script>
 <script type="text/babel" src="signing-app.jsx"></script>

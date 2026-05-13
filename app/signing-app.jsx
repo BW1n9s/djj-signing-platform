@@ -310,6 +310,7 @@ window.SigningPDF = {
         block(tt('Issues / Notes', '问题/备注'), data.issues),
       ].join(''));
     } else {
+      // Lessee + period
       body += section(tt('Parties', '合同方'), [
         block(tt('Lessor', '出租方'), 'DJJ Equipment Pty Ltd\nABN 56 615 358 275\n100 Derby Street, Silverwater NSW 2128'),
         row(tt('Company', '公司'), data.lessee_company),
@@ -319,21 +320,56 @@ window.SigningPDF = {
         row(tt('Email', '邮箱'), data.contact_email),
         row(tt('Delivery address', '收货地址'), data.delivery),
       ].join(''));
-      body += section(tt('Rental Period / Forklift', '租期 / 叉车'), [
+
+      const periodLabel = {
+        weekly: tt('Weekly', '按周'),
+        monthly: tt('Monthly', '按月'),
+        '4weekly': tt('Every 4 weeks', '每4周'),
+        custom: data.ongoing_custom_label || tt('Custom', '自定义'),
+      }[data.period_type] || data.period_type;
+
+      body += section(tt('Rental Period', '租期'), [
         row(tt('Start', '起租'), data.start),
         row(tt('End', '到期'), data.end),
-        row(tt('Description', '描述'), data.f_desc),
-        row(tt('Serial #', '编号'), data.f_serial),
-        row(tt('Weekly rate', '周租金'), data.f_weekly ? `AUD $${data.f_weekly}` : ''),
-        row(tt('Delivery & collection', '送货/回收费'), data.f_delcol ? `AUD $${data.f_delcol}` : ''),
+        row(tt('Billing cycle', '计费周期'), periodLabel),
       ].join(''));
+
+      // Equipment rows
+      const equipments = Array.isArray(data.equipments) ? data.equipments : [{}];
+      equipments.forEach((eq, idx) => {
+        body += section(tt(`Equipment ${idx + 1}`, `设备 ${idx + 1}`), [
+          eq.f_desc ? row(tt('Description', '描述'), eq.f_desc) : '',
+          eq.f_category ? row(tt('Category', '类别'), eq.f_category) : '',
+          eq.f_serial ? row(tt('Serial #', '编号'), eq.f_serial) : '',
+          eq.f_vin ? row(tt('VIN', 'VIN'), eq.f_vin) : '',
+          eq.f_qty ? row(tt('Qty', '数量'), eq.f_qty) : '',
+          eq.f_weekly ? row(tt('Rate', '费率'), `AUD $${eq.f_weekly}`) : '',
+          eq.f_delcol ? row(tt('Delivery & collection', '送货/回收'), `AUD $${eq.f_delcol}`) : '',
+          eq.f_config ? block(tt('Configuration / Notes', '配置/备注'), eq.f_config) : '',
+        ].join(''));
+      });
+
+      // Charges
+      const machineCount = equipments.length || 1;
+      const bondPer = parseFloat(data.bond_per) || 1000;
+      const bondTotal = (machineCount * bondPer).toFixed(2);
+      const intervalLabel = {
+        weekly: tt('Weekly', '每周'),
+        monthly: tt('Monthly', '每月'),
+        '4weekly': tt('Every 4 weeks', '每4周'),
+        custom: data.ongoing_custom_label || tt('Custom', '自定义'),
+      }[data.ongoing_interval] || data.ongoing_interval;
+
       body += section(tt('Charges / Card', '费用 / 信用卡'), [
         row(tt('Initial charge', '初始费用'), data.initial ? `AUD $${data.initial}` : ''),
-        row(tt('Ongoing weekly', '后续周租'), data.ongoing ? `AUD $${data.ongoing}` : ''),
+        row(tt('Bond (per machine)', '保证金(每台)'), `AUD $${data.bond_per || '1,000.00'}`),
+        row(tt('Total bond', '保证金合计'), `AUD $${bondTotal} (×${machineCount})`),
+        row(tt('Ongoing rate', '续租费率'), data.ongoing_rate ? `AUD $${data.ongoing_rate} ${intervalLabel}` : ''),
         row(tt('Name on card', '持卡人'), data.card_name),
         row(tt('Card number', '卡号'), data.card_no ? '**** **** **** ' + String(data.card_no).slice(-4) : ''),
         row(tt('Expiry', '有效期'), data.card_exp),
       ].join(''));
+
       body += section(tt('Execution', '签署'), [
         row(tt('Full name', '全名'), data.full_name),
         row(tt('Position', '职位'), data.position),
@@ -440,6 +476,39 @@ window.SigningPDF = {
     const imgData = canvas.toDataURL('image/png');
     doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
     const pdfDataUrl = doc.output('datauristring');
+
+    // Append T&C and Fair Wear & Tear PDFs for rental agreements
+    if (kind === 'rental') {
+      try {
+        const appendPdf = async (url) => {
+          const resp = await fetch(url);
+          if (!resp.ok) return;
+          const arrayBuffer = await resp.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          for (let p = 1; p <= pdfDoc.numPages; p++) {
+            const page = await pdfDoc.getPage(p);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d');
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            doc.addPage('a4', 'portrait');
+            const pw = doc.internal.pageSize.getWidth();
+            const ph = doc.internal.pageSize.getHeight();
+            const scale = Math.min(pw / viewport.width, ph / viewport.height);
+            const w = viewport.width * scale;
+            const h = viewport.height * scale;
+            doc.addImage(imgData, 'JPEG', (pw - w) / 2, (ph - h) / 2, w, h);
+          }
+        };
+        await appendPdf('../hire-agreement.pdf');
+        await appendPdf('../fair-wear-tear.pdf');
+      } catch (e) {
+        console.warn('Could not append appendix PDFs:', e);
+      }
+    }
     doc.save(fname);
 
     try {

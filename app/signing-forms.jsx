@@ -12,7 +12,7 @@ const T = {
     docDelivery: 'Delivery Order Sign-Off',
     docDispatch: 'Dispatch Report',
     docRental: 'Forklift Rental Agreement',
-    section: { order: 'Order Reference', delivery: 'Delivery Details', transport: 'Transport Company', driver: 'Driver Details', items: 'Items', meta: 'Report Info', vehicle: 'Vehicle / Equipment', times: 'Times', ratings: 'Ratings (1–5)', staff: 'Staff', issues: 'Issues / Notes', lessor: 'Lessor', lessee: 'Lessee', period: 'Rental Period', forklift: 'Forklift', charges: 'Charges', card: 'Credit Card', exec: 'Execution & Signature', sign: 'Signature' },
+    section: { order: 'Order Reference', delivery: 'Delivery Details', transport: 'Transport Company', driver: 'Driver Details', items: 'Items', meta: 'Report Info', vehicle: 'Vehicle / Equipment', times: 'Times', ratings: 'Ratings (1–5)', staff: 'Staff', issues: 'Issues / Notes', lessor: 'Lessor', lessee: 'Lessee', period: 'Rental Period', forklift: 'Forklift', equipment: 'Equipment', charges: 'Charges', card: 'Credit Card', exec: 'Execution & Signature', sign: 'Signature' },
     fields: {
       invoice_no: 'Tax invoice #', invoice_date: 'Invoice date', sales_rep: 'Sales rep',
       pickup_location: 'Pick up location', customer_name: 'Customer name', customer_abn: 'Customer ABN',
@@ -33,9 +33,27 @@ const T = {
       start: 'Start date', end: 'End date',
       f_desc: 'Description', f_serial: 'Serial #', f_weekly: 'Weekly rate', f_delcol: 'Delivery & collection',
       initial: 'Initial charge', ongoing: 'Ongoing weekly',
+      period_type: 'Billing cycle',
+      f_category: 'Category',
+      f_vin: 'VIN / Serial',
+      f_config: 'Configuration / Notes',
+      f_qty: 'Qty',
+      bond_per: 'Bond per machine',
+      bond_total: 'Total bond',
+      ongoing_interval: 'Billing interval',
+      ongoing_rate: 'Rate per interval',
       card_name: 'Name on card', card_no: 'Card number', card_exp: 'Expiry', card_ccv: 'CCV',
       full_name: 'Full name', position: 'Position',
     },
+    addEquipment: '+ Add equipment',
+    removeEquipment: 'Remove',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    every4weeks: 'Every 4 weeks',
+    custom: 'Custom',
+    perWeek: '/wk',
+    perMonth: '/mo',
+    per4Weeks: '/4wk',
     saveDownload: 'Save & Download PDF',
     deliverySubmit: 'Generate PDF & Submit',
     copyLink: 'Copy driver signing link',
@@ -55,7 +73,7 @@ const T = {
     docDelivery: '送货签收单',
     docDispatch: '发货报告',
     docRental: '叉车租赁协议',
-    section: { order: '订单参考', delivery: '送货信息', transport: '运输公司', driver: '司机信息', items: '货物明细', meta: '报告信息', vehicle: '车辆/设备', times: '时间', ratings: '评分 (1–5)', staff: '人员', issues: '问题/备注', lessor: '出租方', lessee: '承租方', period: '租期', forklift: '叉车', charges: '费用', card: '信用卡', exec: '签署', sign: '签字' },
+    section: { order: '订单参考', delivery: '送货信息', transport: '运输公司', driver: '司机信息', items: '货物明细', meta: '报告信息', vehicle: '车辆/设备', times: '时间', ratings: '评分 (1–5)', staff: '人员', issues: '问题/备注', lessor: '出租方', lessee: '承租方', period: '租期', forklift: '叉车', equipment: '设备明细', charges: '费用', card: '信用卡', exec: '签署', sign: '签字' },
     fields: {
       invoice_no: '税务发票号', invoice_date: '发票日期', sales_rep: '销售代表',
       pickup_location: '取货地点', customer_name: '客户名称', customer_abn: '客户 ABN',
@@ -76,9 +94,27 @@ const T = {
       start: '起租日期', end: '到期日期',
       f_desc: '描述', f_serial: '编号', f_weekly: '周租金', f_delcol: '送货/回收费',
       initial: '初始费用', ongoing: '后续周租',
+      period_type: '计费周期',
+      f_category: '设备类别',
+      f_vin: 'VIN / 序列号',
+      f_config: '配置 / 备注',
+      f_qty: '数量',
+      bond_per: '每台保证金',
+      bond_total: '保证金合计',
+      ongoing_interval: '计费间隔',
+      ongoing_rate: '每期租金',
       card_name: '持卡人', card_no: '卡号', card_exp: '有效期', card_ccv: 'CCV',
       full_name: '全名', position: '职位',
     },
+    addEquipment: '+ 添加设备',
+    removeEquipment: '删除',
+    weekly: '按周',
+    monthly: '按月',
+    every4weeks: '每4周',
+    custom: '自定义',
+    perWeek: '/周',
+    perMonth: '/月',
+    per4Weeks: '/4周',
     saveDownload: '保存并下载 PDF',
     deliverySubmit: '生成 PDF 并提交',
     copyLink: '复制司机签署链接',
@@ -218,6 +254,84 @@ function DeliveryItems({ items, lang }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function EquipmentRows({ rows, lang, onChange }) {
+  const t = T[lang];
+  const update = (idx, key, val) => {
+    const next = rows.map((r, i) => i === idx ? { ...r, [key]: val } : r);
+    onChange(next);
+  };
+  const add = () => onChange([...rows, {}]);
+  const remove = (idx) => onChange(rows.filter((_, i) => i !== idx));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {rows.map((row, idx) => (
+        <div key={idx} style={{
+          border: '1px solid var(--rule)', borderRadius: 6,
+          padding: 12, background: '#fff',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: 10,
+          }}>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+              {lang === 'zh' ? `设备 ${idx + 1}` : `Equipment ${idx + 1}`}
+            </span>
+            {rows.length > 1 && (
+              <button type="button" onClick={() => remove(idx)} style={{
+                background: 'transparent', border: '1px solid var(--rule)',
+                borderRadius: 4, padding: '3px 8px', fontSize: 11,
+                color: 'var(--muted)', cursor: 'pointer',
+              }}>{t.removeEquipment}</button>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            {[
+              { key: 'f_desc', en: t.fields.f_desc, zh: T.zh.fields.f_desc },
+              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category },
+              { key: 'f_serial', en: t.fields.f_serial, zh: T.zh.fields.f_serial },
+              { key: 'f_vin', en: t.fields.f_vin, zh: T.zh.fields.f_vin },
+              { key: 'f_weekly', en: t.fields.f_weekly, zh: T.zh.fields.f_weekly, suffix: 'AUD' },
+              { key: 'f_delcol', en: t.fields.f_delcol, zh: T.zh.fields.f_delcol, suffix: 'AUD' },
+              { key: 'f_qty', en: t.fields.f_qty, zh: T.zh.fields.f_qty },
+              { key: 'f_config', en: t.fields.f_config, zh: T.zh.fields.f_config, wide: true },
+            ].map(({ key, en, zh, suffix, wide }) => (
+              <div key={key} style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
+                <Label en={en} zh={zh} lang={lang} />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={row[key] || ''}
+                    onChange={e => update(idx, key, e.target.value)}
+                    placeholder={lang === 'zh' ? '请输入…' : 'Enter…'}
+                    style={{
+                      width: '100%', minHeight: 44, padding: '10px 12px',
+                      paddingRight: suffix ? 38 : 12,
+                      background: '#fff', border: '1px solid var(--rule)',
+                      borderRadius: 6, fontSize: 15, outline: 'none',
+                    }}
+                  />
+                  {suffix && (
+                    <span style={{
+                      position: 'absolute', right: 10, top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: 12, color: 'var(--muted)',
+                      fontFamily: 'JetBrains Mono, monospace',
+                    }}>{suffix}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={add} style={{
+        minHeight: 44, background: '#fff', border: '1px dashed var(--rule)',
+        borderRadius: 6, fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
+      }}>{t.addEquipment}</button>
     </div>
   );
 }
@@ -380,12 +494,24 @@ const DEFAULT_RENTAL = {
   delivery: '22 Industrial Dr, Wetherill Park NSW 2164',
   start: '12 May 2026',
   end: '11 Aug 2026',
-  f_desc: 'Toyota 8FG25 Forklift',
-  f_serial: 'TY-2208',
-  f_weekly: '385.00',
-  f_delcol: '220.00',
+  period_type: 'weekly',          // 'weekly' | 'monthly' | '4weekly' | 'custom'
+  equipments: [
+    {
+      f_desc: 'Toyota 8FG25 Forklift',
+      f_category: '',
+      f_serial: 'TY-2208',
+      f_vin: '',
+      f_weekly: '385.00',
+      f_delcol: '220.00',
+      f_qty: '1',
+      f_config: '',
+    }
+  ],
+  bond_per: '1000.00',
+  ongoing_interval: 'weekly',     // 'weekly' | '4weekly' | 'monthly' | 'custom'
+  ongoing_custom_label: '',       // used when interval = 'custom'
+  ongoing_rate: '385.00',
   initial: '605.00',
-  ongoing: '385.00',
   card_name: '',
   card_no: '',
   card_exp: '',
@@ -393,7 +519,11 @@ const DEFAULT_RENTAL = {
   full_name: 'Sarah Lee',
   position: 'Operations Manager',
 };
-const PREFILLED_RENTAL_KEYS = ['agreement_no','lessee_company','lessee_abn','contact_name','contact_phone','contact_email','delivery','start','end','f_desc','f_serial','f_weekly','f_delcol','initial','ongoing','full_name','position'];
+
+const PREFILLED_RENTAL_KEYS = [
+  'agreement_no','lessee_company','lessee_abn','contact_name','contact_phone',
+  'contact_email','delivery','start','end','full_name','position',
+];
 
 // ───────────────────── Doc shells (printable) ──────────────────────────────
 function DeliveryBody({ data, set, lang, sigSlot }) {
@@ -530,6 +660,38 @@ function RentalBody({ data, set, lang, sigSlot }) {
       {...opts}
     />
   );
+
+  // Bond auto-calc from equipments length
+  const machineCount = (data.equipments || []).length || 1;
+  const bondPer = parseFloat(data.bond_per) || 1000;
+  const bondTotal = (machineCount * bondPer).toFixed(2);
+
+  const periodOptions = [
+    { value: 'weekly', label: t.weekly },
+    { value: 'monthly', label: t.monthly },
+    { value: '4weekly', label: t.every4weeks },
+    { value: 'custom', label: t.custom },
+  ];
+
+  const SelectField = ({ name, labelEn, labelZh, options, value, onChange: onChg }) => (
+    <div>
+      <Label en={labelEn} zh={labelZh} lang={lang} />
+      <select
+        value={value || ''}
+        onChange={e => onChg(name, e.target.value)}
+        style={{
+          width: '100%', minHeight: 44, padding: '10px 12px',
+          background: '#fff', border: '1px solid var(--rule)',
+          borderRadius: 6, fontSize: 15, outline: 'none',
+        }}
+      >
+        {options.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <DocHeader
@@ -537,6 +699,7 @@ function RentalBody({ data, set, lang, sigSlot }) {
         subtitle={data.agreement_no}
         badge={t.fullyMaintained}
       />
+
       <SectionHead>{t.section.lessor}</SectionHead>
       <div style={{
         background: 'var(--pre)', border: '1px solid var(--pre-edge)',
@@ -554,16 +717,80 @@ function RentalBody({ data, set, lang, sigSlot }) {
       <SectionHead>{t.section.period}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
         {F('start')}{F('end')}
+        <SelectField
+          name="period_type"
+          labelEn={t.fields.period_type}
+          labelZh={T.zh.fields.period_type}
+          options={periodOptions}
+          value={data.period_type}
+          onChange={set}
+        />
       </div>
 
-      <SectionHead>{t.section.forklift}</SectionHead>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 10 }}>
-        {F('f_desc')}{F('f_serial')}{F('f_weekly', { suffix: 'AUD' })}{F('f_delcol', { suffix: 'AUD' })}
-      </div>
+      <SectionHead>{t.section.equipment}</SectionHead>
+      <EquipmentRows
+        rows={data.equipments || [{}]}
+        lang={lang}
+        onChange={rows => set('equipments', rows)}
+      />
 
       <SectionHead>{t.section.charges}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('initial', { suffix: 'AUD' })}{F('ongoing', { suffix: 'AUD/wk' })}
+        {F('initial', { suffix: 'AUD' })}
+        <div>
+          <Label en={t.fields.bond_per} zh={T.zh.fields.bond_per} lang={lang} />
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+          }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                value={data.bond_per || ''}
+                onChange={e => set('bond_per', e.target.value)}
+                placeholder="1000.00"
+                style={{
+                  width: '100%', minHeight: 44, padding: '10px 36px 10px 12px',
+                  background: '#fff', border: '1px solid var(--rule)',
+                  borderRadius: 6, fontSize: 15, outline: 'none',
+                }}
+              />
+              <span style={{
+                position: 'absolute', right: 10, top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 12, color: 'var(--muted)',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}>AUD</span>
+            </div>
+            <div style={{
+              minHeight: 44, padding: '10px 12px',
+              background: '#faf9f5', border: '1px solid var(--rule)',
+              borderRadius: 6, fontSize: 14, display: 'flex', alignItems: 'center',
+              color: 'var(--ink-2)',
+            }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginRight: 6 }}>
+                ×{machineCount} =
+              </span>
+              AUD {bondTotal}
+            </div>
+          </div>
+        </div>
+
+        <SelectField
+          name="ongoing_interval"
+          labelEn={t.fields.ongoing_interval}
+          labelZh={T.zh.fields.ongoing_interval}
+          options={periodOptions}
+          value={data.ongoing_interval}
+          onChange={set}
+        />
+        {F('ongoing_rate', { suffix: 'AUD' })}
+
+        {data.ongoing_interval === 'custom' && (
+          <Field name="ongoing_custom_label"
+            en="Custom interval label" zh="自定义间隔说明"
+            lang={lang} value={data.ongoing_custom_label} onChange={set}
+            wide
+          />
+        )}
       </div>
 
       <SectionHead>{t.section.card}</SectionHead>
