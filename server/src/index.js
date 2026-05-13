@@ -8,6 +8,8 @@ import larkRouter from './lark/webhook.js';
 import { sendSignedPDF } from './delivery/mailer.js';
 import { sendMessage } from './lark/client.js';
 import { sendPDFToLark } from './lark/sendFile.js';
+import { uploadPDFToDrive } from './lark/driveUpload.js';
+import { sendSignedCard } from './lark/signedCard.js';
 
 const app = new Hono();
 
@@ -72,6 +74,30 @@ app.post('/delivery/pdf-to-lark', async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.error('[/delivery/pdf-to-lark]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// POST /signed
+// 三种文档通用：上传 PDF 到飞书云盘 + 发卡片给操作员
+// kind = 'delivery' | 'dispatch' | 'rental'
+app.post('/signed', async (c) => {
+  const env = c.env;
+  let body;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: 'Invalid JSON' }, 400); }
+
+  const { kind, open_id, pdfDataUrl, filename, data } = body;
+  if (!open_id || !pdfDataUrl) {
+    return c.json({ ok: false, error: 'Missing open_id or pdfDataUrl' }, 400);
+  }
+
+  try {
+    const base64 = pdfDataUrl.replace(/^data:application\/pdf;base64,/, '');
+    const file_token = await uploadPDFToDrive(env, { pdfBase64: base64, filename });
+    await sendSignedCard(env, { open_id, file_token, kind: kind || 'delivery', data });
+    return c.json({ ok: true, file_token });
+  } catch (err) {
+    console.error('[/signed]', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

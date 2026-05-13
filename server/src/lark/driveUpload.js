@@ -6,6 +6,13 @@ export function driveFileUrl(file_token) {
   return `https://applink.larksuite.com/client/drive/open?token=${file_token}&type=file`;
 }
 
+export async function uploadPDFToDrive(env, { pdfBase64, filename, folderToken }) {
+  const binaryStr = atob(pdfBase64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+  return uploadFileToDrive(env, { filename, mimeType: 'application/pdf', bytes, folderToken });
+}
+
 export async function uploadFileToDrive(env, { filename, mimeType, bytes, folderToken }) {
   const token = await getTenantAccessToken(env);
 

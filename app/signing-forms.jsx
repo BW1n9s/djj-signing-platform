@@ -907,43 +907,46 @@ function makeForm(kind) {
             ? (data.report_no || 'dispatch-report')
             : (data.agreement_no || 'rental-agreement')) + '.pdf';
         const generated = await window.SigningPDF.generate({ kind, data, sigImg, lessorSigImg, lang, filename });
-        if (kind === 'delivery') {
-          const emailPayload = {
-            to: 'anita@djjequipment.com.au',
-            subject: `DJJ Delivery Order ${data.invoice_no || ''}`.trim(),
-            filename,
-            data,
-            pdfDataUrl: generated?.pdfDataUrl || '',
-          };
-          if (window.DeliveryOrderMailer?.send) {
-            await window.DeliveryOrderMailer.send(emailPayload);
-            setNote(t.emailedViaBridge);
-          } else if (window.parent !== window) {
-            window.parent.postMessage({ type: 'delivery-order:ready-to-email', payload: emailPayload }, '*');
-            setNote(t.emailedViaHost);
-          } else {
-            setNote(t.missingMailer);
-          }
-        }
+        // ── Lark Drive 回传（三种文档通用）──────────────────
         const openId = data.open_id || new URLSearchParams(window.location.search).get('open_id');
         if (openId && generated?.pdfDataUrl) {
           const workerBase = window.WORKER_BASE || 'https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev';
+          // delivery 仍额外走 Gmail 流程
+          if (kind === 'delivery') {
+            const emailPayload = {
+              to: 'anita@djjequipment.com.au',
+              subject: `DJJ Delivery Order ${data.invoice_no || ''}`.trim(),
+              filename,
+              data,
+              pdfDataUrl: generated.pdfDataUrl,
+            };
+            if (window.DeliveryOrderMailer?.send) {
+              await window.DeliveryOrderMailer.send(emailPayload).catch(console.warn);
+            } else if (window.parent !== window) {
+              window.parent.postMessage({ type: 'delivery-order:ready-to-email', payload: emailPayload }, '*');
+            }
+          }
+          // 所有类型都上传到 Lark Drive
           try {
-            await fetch(`${workerBase}/delivery/pdf-to-lark`, {
+            await fetch(`${workerBase}/signed`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                kind,
                 open_id: openId,
                 pdfDataUrl: generated.pdfDataUrl,
                 filename,
                 data,
               }),
             });
-            setNote((prev) => (prev ? prev + ' · PDF sent to Lark ✓' : 'PDF sent to Lark ✓'));
+            setNote(lang === 'zh'
+              ? 'PDF 已保存至飞书云盘 ✓'
+              : 'PDF saved to Lark Drive ✓');
           } catch (e) {
-            console.warn('[Lark PDF] failed to send back to Lark:', e);
+            console.warn('[Lark /signed]', e);
           }
         }
+        // ────────────────────────────────────────────────────
         onDone({ kind, data, sigImg, filename, pdfDataUrl: generated?.pdfDataUrl || '' });
       } catch (e) {
         console.error(e);
