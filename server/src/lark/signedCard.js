@@ -1,5 +1,5 @@
 import { getTenantAccessToken } from './client.js';
-import { driveFileUrl } from './driveUpload.js';
+import { driveFileUrl, grantDriveAccess } from './driveUpload.js';
 
 const LARK_BASE = 'https://open.larksuite.com/open-apis';
 
@@ -37,6 +37,7 @@ const KIND_META = {
 };
 
 export async function sendSignedCard(env, { open_id, file_token, kind, data }) {
+  await grantDriveAccess(env, { file_token, open_id });
   const token = await getTenantAccessToken(env);
   const meta = KIND_META[kind] || KIND_META.delivery;
   const fileUrl = driveFileUrl(file_token);

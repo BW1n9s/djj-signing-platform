@@ -96,6 +96,7 @@ app.post('/signed', async (c) => {
     const commaIdx = pdfDataUrl.indexOf(',');
     const base64 = commaIdx !== -1 ? pdfDataUrl.slice(commaIdx + 1) : pdfDataUrl;
     const file_token = await uploadPDFToDrive(env, { pdfBase64: base64, filename });
+    console.log('[/signed] uploaded file_token:', file_token, 'kind:', kind, 'open_id:', open_id);
     await sendSignedCard(env, { open_id, file_token, kind: kind || 'delivery', data });
     return c.json({ ok: true, file_token });
   } catch (err) {

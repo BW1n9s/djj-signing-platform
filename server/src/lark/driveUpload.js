@@ -35,3 +35,17 @@ export async function uploadFileToDrive(env, { filename, mimeType, bytes, folder
   if (data.code !== 0) throw new Error(`[Lark Drive] Upload failed (${data.code}): ${data.msg}`);
   return data.data.file_token;
 }
+
+export async function grantDriveAccess(env, { file_token, open_id }) {
+  const token = await getTenantAccessToken(env);
+  const resp = await fetch(
+    `${LARK_BASE}/drive/v1/permissions/${file_token}/members?type=file`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_type: 'openid', member_id: open_id, perm: 'view' }),
+    }
+  );
+  const data = await resp.json();
+  if (data.code !== 0) console.warn(`[Lark Drive] Grant access failed (${data.code}): ${data.msg}`);
+}
