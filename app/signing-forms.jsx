@@ -925,6 +925,25 @@ function makeForm(kind) {
             setNote(t.missingMailer);
           }
         }
+        const openId = data.open_id || new URLSearchParams(window.location.search).get('open_id');
+        if (openId && generated?.pdfDataUrl) {
+          const workerBase = window.WORKER_BASE || 'https://djj-signing-bot.YOUR_SUBDOMAIN.workers.dev';
+          try {
+            await fetch(`${workerBase}/delivery/pdf-to-lark`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                open_id: openId,
+                pdfDataUrl: generated.pdfDataUrl,
+                filename,
+                data,
+              }),
+            });
+            setNote((prev) => (prev ? prev + ' · PDF sent to Lark ✓' : 'PDF sent to Lark ✓'));
+          } catch (e) {
+            console.warn('[Lark PDF] failed to send back to Lark:', e);
+          }
+        }
         onDone({ kind, data, sigImg, filename, pdfDataUrl: generated?.pdfDataUrl || '' });
       } catch (e) {
         console.error(e);

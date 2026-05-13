@@ -7,6 +7,7 @@ import { cors } from 'hono/cors';
 import larkRouter from './lark/webhook.js';
 import { sendSignedPDF } from './delivery/mailer.js';
 import { sendMessage } from './lark/client.js';
+import { sendPDFToLark } from './lark/sendFile.js';
 
 const app = new Hono();
 
@@ -46,6 +47,31 @@ app.post('/delivery/signed', async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.error('[/delivery/signed]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// POST /delivery/pdf-to-lark
+// 签字完成后将 PDF 发回操作员的 Lark 对话
+// After signing, sends the PDF back to the operator's Lark chat
+app.post('/delivery/pdf-to-lark', async (c) => {
+  const env = c.env;
+  let body;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: 'Invalid JSON' }, 400); }
+  const { open_id, pdfDataUrl, filename, data } = body;
+  if (!open_id || !pdfDataUrl) return c.json({ ok: false, error: 'Missing open_id or pdfDataUrl' }, 400);
+  try {
+    const base64 = pdfDataUrl.replace(/^data:application\/pdf;base64,/, '');
+    const caption = [
+      '✅ 签字已完成 / Delivery order signed',
+      data?.invoice_no    ? `📄 发票号 Invoice: ${data.invoice_no}`    : null,
+      data?.customer_name ? `👤 客户 Customer: ${data.customer_name}` : null,
+      data?.driver_name   ? `🚛 司机 Driver: ${data.driver_name}`     : null,
+    ].filter(Boolean).join('\n');
+    await sendPDFToLark(env, { open_id, pdfBase64: base64, filename, caption });
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[/delivery/pdf-to-lark]', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

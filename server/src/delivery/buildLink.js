@@ -45,6 +45,10 @@ export function buildDriverSigningUrl(data, env, baseUrl) {
     }
   }
 
+  if (data.open_id && String(data.open_id).trim()) {
+    params.set('open_id', String(data.open_id).trim());
+  }
+
   // 货物列表 JSON 编码 / Encode items list as JSON
   if (Array.isArray(data.delivery_items) && data.delivery_items.length > 0) {
     params.set('delivery_items', JSON.stringify(data.delivery_items));

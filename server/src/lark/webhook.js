@@ -200,19 +200,20 @@ async function processSelectedEmail(env, open_id, email) {
     return;
   }
 
-  const signingUrl = buildDriverSigningUrl(data, env);
+  const dataWithOpenId = { ...data, open_id };
+  const signingUrl = buildDriverSigningUrl(dataWithOpenId, env);
 
   const summary = [
     '✅ 已提取送货信息 / Delivery info extracted:',
-    data.invoice_no      ? `📄 发票号 Invoice No:    ${data.invoice_no}`      : null,
-    data.customer_name   ? `👤 客户 Customer:        ${data.customer_name}`   : null,
-    data.delivery_address? `📍 地址 Address:         ${data.delivery_address}` : null,
+    data.invoice_no       ? `📄 发票号 Invoice No:    ${data.invoice_no}`       : null,
+    data.customer_name    ? `👤 客户 Customer:        ${data.customer_name}`    : null,
+    data.delivery_address ? `📍 地址 Address:         ${data.delivery_address}` : null,
     '',
     '🔗 司机签字链接 / Driver signing link:',
     signingUrl,
     '',
-    '请将此链接发给司机完成签字。签字完成后 PDF 将自动发送至 anita@djjequipment.com.au',
-    'Share this link with the driver. The signed PDF will be emailed to Anita automatically.',
+    '请将此链接发给司机完成签字。签字完成后 PDF 将自动发回此对话。',
+    'Share this link with the driver. The signed PDF will be sent back here automatically.',
   ].filter(line => line !== null).join('\n');
 
   await sendMessage(env, open_id, summary);
