@@ -44,6 +44,8 @@ const T = {
       ongoing_rate: 'Rate per interval',
       card_name: 'Name on card', card_no: 'Card number', card_exp: 'Expiry', card_ccv: 'CCV',
       full_name: 'Full name', position: 'Position',
+      lessor_name: 'Lessor name',
+      lessor_position: 'Lessor position',
     },
     addEquipment: '+ Add equipment',
     removeEquipment: 'Remove',
@@ -54,6 +56,10 @@ const T = {
     perWeek: '/wk',
     perMonth: '/mo',
     per4Weeks: '/4wk',
+    lessorSig: 'LESSOR SIGNATURE',
+    lesseeSig: 'LESSEE SIGNATURE',
+    autoSign: 'Auto-sign (DJJ)',
+    autoSigned: 'Auto-signed',
     saveDownload: 'Save & Download PDF',
     deliverySubmit: 'Generate PDF & Submit',
     copyLink: 'Copy driver signing link',
@@ -105,6 +111,8 @@ const T = {
       ongoing_rate: '每期租金',
       card_name: '持卡人', card_no: '卡号', card_exp: '有效期', card_ccv: 'CCV',
       full_name: '全名', position: '职位',
+      lessor_name: '出租方签署人',
+      lessor_position: '职位',
     },
     addEquipment: '+ 添加设备',
     removeEquipment: '删除',
@@ -115,6 +123,10 @@ const T = {
     perWeek: '/周',
     perMonth: '/月',
     per4Weeks: '/4周',
+    lessorSig: '出租方签字',
+    lesseeSig: '承租方签字',
+    autoSign: '自动签署 (DJJ)',
+    autoSigned: '已自动签署',
     saveDownload: '保存并下载 PDF',
     deliverySubmit: '生成 PDF 并提交',
     copyLink: '复制司机签署链接',
@@ -291,14 +303,12 @@ function EquipmentRows({ rows, lang, onChange }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[
-              { key: 'f_desc', en: t.fields.f_desc, zh: T.zh.fields.f_desc },
+              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc },
               { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category },
-              { key: 'f_serial', en: t.fields.f_serial, zh: T.zh.fields.f_serial },
-              { key: 'f_vin', en: t.fields.f_vin, zh: T.zh.fields.f_vin },
-              { key: 'f_weekly', en: t.fields.f_weekly, zh: T.zh.fields.f_weekly, suffix: 'AUD' },
-              { key: 'f_delcol', en: t.fields.f_delcol, zh: T.zh.fields.f_delcol, suffix: 'AUD' },
-              { key: 'f_qty', en: t.fields.f_qty, zh: T.zh.fields.f_qty },
-              { key: 'f_config', en: t.fields.f_config, zh: T.zh.fields.f_config, wide: true },
+              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin },
+              { key: 'f_weekly',   en: t.fields.f_weekly,   zh: T.zh.fields.f_weekly,   suffix: 'AUD' },
+              { key: 'f_delcol',   en: t.fields.f_delcol,   zh: T.zh.fields.f_delcol,   suffix: 'AUD' },
+              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true },
             ].map(({ key, en, zh, suffix, wide }) => (
               <div key={key} style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
                 <Label en={en} zh={zh} lang={lang} />
@@ -494,30 +504,27 @@ const DEFAULT_RENTAL = {
   delivery: '22 Industrial Dr, Wetherill Park NSW 2164',
   start: '12 May 2026',
   end: '11 Aug 2026',
-  period_type: 'weekly',          // 'weekly' | 'monthly' | '4weekly' | 'custom'
+  period_type: 'weekly',
   equipments: [
     {
       f_desc: 'Toyota 8FG25 Forklift',
       f_category: '',
-      f_serial: 'TY-2208',
-      f_vin: '',
+      f_vin: 'TY-2208',
       f_weekly: '385.00',
       f_delcol: '220.00',
-      f_qty: '1',
       f_config: '',
     }
   ],
   bond_per: '1000.00',
-  ongoing_interval: 'weekly',     // 'weekly' | '4weekly' | 'monthly' | 'custom'
-  ongoing_custom_label: '',       // used when interval = 'custom'
+  bond_total: '1000.00',
+  ongoing_interval: 'weekly',
+  ongoing_custom_label: '',
   ongoing_rate: '385.00',
   initial: '605.00',
-  card_name: '',
-  card_no: '',
-  card_exp: '',
-  card_ccv: '',
   full_name: 'Sarah Lee',
   position: 'Operations Manager',
+  lessor_name: '',
+  lessor_position: '',
 };
 
 const PREFILLED_RENTAL_KEYS = [
@@ -651,7 +658,7 @@ function DispatchBody({ data, set, lang, sigSlot }) {
   );
 }
 
-function RentalBody({ data, set, lang, sigSlot }) {
+function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
   const t = T[lang];
   const F = (key, opts = {}) => (
     <Field name={key} en={t.fields[key]} zh={T.zh.fields[key]} lang={lang}
@@ -661,19 +668,14 @@ function RentalBody({ data, set, lang, sigSlot }) {
     />
   );
 
-  // Bond auto-calc from equipments length
-  const machineCount = (data.equipments || []).length || 1;
-  const bondPer = parseFloat(data.bond_per) || 1000;
-  const bondTotal = (machineCount * bondPer).toFixed(2);
-
   const periodOptions = [
-    { value: 'weekly', label: t.weekly },
-    { value: 'monthly', label: t.monthly },
-    { value: '4weekly', label: t.every4weeks },
-    { value: 'custom', label: t.custom },
+    { value: 'weekly',   label: t.weekly },
+    { value: 'monthly',  label: t.monthly },
+    { value: '4weekly',  label: t.every4weeks },
+    { value: 'custom',   label: t.custom },
   ];
 
-  const SelectField = ({ name, labelEn, labelZh, options, value, onChange: onChg }) => (
+  const SelectField = ({ name, labelEn, labelZh, options, value, onChg }) => (
     <div>
       <Label en={labelEn} zh={labelZh} lang={lang} />
       <select
@@ -692,13 +694,16 @@ function RentalBody({ data, set, lang, sigSlot }) {
     </div>
   );
 
+  // Auto-update bond_total when bond_per or equipments change
+  const machineCount = (data.equipments || []).length || 1;
+  useEffect(() => {
+    const auto = (parseFloat(data.bond_per) || 1000) * machineCount;
+    set('bond_total', auto.toFixed(2));
+  }, [data.bond_per, machineCount]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <DocHeader
-        title={t.docRental}
-        subtitle={data.agreement_no}
-        badge={t.fullyMaintained}
-      />
+      <DocHeader title={t.docRental} subtitle={data.agreement_no} badge={t.fullyMaintained} />
 
       <SectionHead>{t.section.lessor}</SectionHead>
       <div style={{
@@ -718,12 +723,8 @@ function RentalBody({ data, set, lang, sigSlot }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
         {F('start')}{F('end')}
         <SelectField
-          name="period_type"
-          labelEn={t.fields.period_type}
-          labelZh={T.zh.fields.period_type}
-          options={periodOptions}
-          value={data.period_type}
-          onChange={set}
+          name="period_type" labelEn={t.fields.period_type} labelZh={T.zh.fields.period_type}
+          options={periodOptions} value={data.period_type} onChg={set}
         />
       </div>
 
@@ -737,73 +738,94 @@ function RentalBody({ data, set, lang, sigSlot }) {
       <SectionHead>{t.section.charges}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
         {F('initial', { suffix: 'AUD' })}
+
+        {/* Bond per machine */}
         <div>
           <Label en={t.fields.bond_per} zh={T.zh.fields.bond_per} lang={lang} />
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-          }}>
-            <div style={{ position: 'relative' }}>
-              <input
-                value={data.bond_per || ''}
-                onChange={e => set('bond_per', e.target.value)}
-                placeholder="1000.00"
-                style={{
-                  width: '100%', minHeight: 44, padding: '10px 36px 10px 12px',
-                  background: '#fff', border: '1px solid var(--rule)',
-                  borderRadius: 6, fontSize: 15, outline: 'none',
-                }}
-              />
-              <span style={{
-                position: 'absolute', right: 10, top: '50%',
-                transform: 'translateY(-50%)',
-                fontSize: 12, color: 'var(--muted)',
-                fontFamily: 'JetBrains Mono, monospace',
-              }}>AUD</span>
-            </div>
-            <div style={{
-              minHeight: 44, padding: '10px 12px',
-              background: '#faf9f5', border: '1px solid var(--rule)',
-              borderRadius: 6, fontSize: 14, display: 'flex', alignItems: 'center',
-              color: 'var(--ink-2)',
-            }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginRight: 6 }}>
-                ×{machineCount} =
-              </span>
-              AUD {bondTotal}
-            </div>
+          <div style={{ position: 'relative' }}>
+            <input
+              value={data.bond_per || ''}
+              onChange={e => set('bond_per', e.target.value)}
+              placeholder="1000.00"
+              style={{
+                width: '100%', minHeight: 44, padding: '10px 38px 10px 12px',
+                background: '#fff', border: '1px solid var(--rule)',
+                borderRadius: 6, fontSize: 15, outline: 'none',
+              }}
+            />
+            <span style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 12, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace',
+            }}>AUD</span>
+          </div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+            × {machineCount} {lang === 'zh' ? '台' : 'machine(s)'}
+          </div>
+        </div>
+
+        {/* Bond total — manually editable, auto-seeded */}
+        <div>
+          <Label en={t.fields.bond_total} zh={T.zh.fields.bond_total} lang={lang} />
+          <div style={{ position: 'relative' }}>
+            <input
+              value={data.bond_total || ''}
+              onChange={e => set('bond_total', e.target.value)}
+              placeholder={(((parseFloat(data.bond_per) || 1000) * machineCount)).toFixed(2)}
+              style={{
+                width: '100%', minHeight: 44, padding: '10px 38px 10px 12px',
+                background: '#fff', border: '1px solid var(--rule)',
+                borderRadius: 6, fontSize: 15, outline: 'none',
+              }}
+            />
+            <span style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 12, color: 'var(--muted)', fontFamily: 'JetBrains Mono, monospace',
+            }}>AUD</span>
           </div>
         </div>
 
         <SelectField
-          name="ongoing_interval"
-          labelEn={t.fields.ongoing_interval}
-          labelZh={T.zh.fields.ongoing_interval}
-          options={periodOptions}
-          value={data.ongoing_interval}
-          onChange={set}
+          name="ongoing_interval" labelEn={t.fields.ongoing_interval} labelZh={T.zh.fields.ongoing_interval}
+          options={periodOptions} value={data.ongoing_interval} onChg={set}
         />
         {F('ongoing_rate', { suffix: 'AUD' })}
 
         {data.ongoing_interval === 'custom' && (
           <Field name="ongoing_custom_label"
             en="Custom interval label" zh="自定义间隔说明"
-            lang={lang} value={data.ongoing_custom_label} onChange={set}
-            wide
+            lang={lang} value={data.ongoing_custom_label} onChange={set} wide
           />
         )}
-      </div>
-
-      <SectionHead>{t.section.card}</SectionHead>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('card_name')}{F('card_no', { placeholder: '•••• •••• •••• ••••' })}
-        {F('card_exp', { placeholder: 'MM / YY' })}{F('card_ccv', { placeholder: '•••' })}
       </div>
 
       <SectionHead>{t.section.exec}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
         {F('full_name')}{F('position')}
       </div>
-      {sigSlot}
+
+      {/* Dual signature block */}
+      <SectionHead>{t.section.sign}</SectionHead>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Lessee — uses the passed-in sigSlot */}
+        <div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
+            {t.lesseeSig}
+          </div>
+          {sigSlot}
+        </div>
+
+        {/* Lessor */}
+        <div>
+          <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
+            {t.lessorSig}
+          </div>
+          {lessorSigSlot}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
+        {F('lessor_name')}{F('lessor_position')}
+      </div>
     </div>
   );
 }
@@ -825,6 +847,9 @@ function makeForm(kind) {
     const set = (k, v) => setData(d => ({ ...d, [k]: v }));
     const sigRef = useRef(null);
     const [sigEmpty, setSigEmpty] = useState(true);
+    const lessorSigRef = useRef(null);
+    const [lessorSigEmpty, setLessorSigEmpty] = useState(true);
+    const [lessorAutoSigned, setLessorAutoSigned] = useState(false);
     const [err, setErr] = useState('');
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
@@ -848,6 +873,20 @@ function makeForm(kind) {
       return () => window.removeEventListener('message', onMsg);
     }, [kind]);
 
+    useEffect(() => {
+      if (kind !== 'rental') return;
+      window.DJJAutoSign = ({ dataUrl, name, position } = {}) => {
+        if (dataUrl && lessorSigRef.current?.drawDataURL) {
+          lessorSigRef.current.drawDataURL(dataUrl);
+        }
+        setLessorAutoSigned(true);
+        setLessorSigEmpty(false);
+        if (name)     setData(d => ({ ...d, lessor_name: name }));
+        if (position) setData(d => ({ ...d, lessor_position: position }));
+      };
+      return () => { delete window.DJJAutoSign; };
+    }, [kind]);
+
     const submit = async () => {
       if (kind === 'delivery' && (!data.driver_name || !data.driver_phone || !data.vehicle_rego)) {
         setErr(lang === 'zh' ? '请填写司机姓名、电话和车牌。' : 'Please fill driver name, phone, and vehicle rego.');
@@ -858,13 +897,16 @@ function makeForm(kind) {
       try {
         // 1. Stamp signature into the printable region
         const sigImg = sigRef.current.toDataURL();
+        const lessorSigImg = (kind === 'rental' && lessorSigRef.current && !lessorSigRef.current.isEmpty())
+          ? lessorSigRef.current.toDataURL()
+          : null;
         // 2. Build a clean printable doc using current values
         const filename = (kind === 'delivery'
           ? (data.invoice_no || 'delivery-order')
           : kind === 'dispatch'
             ? (data.report_no || 'dispatch-report')
             : (data.agreement_no || 'rental-agreement')) + '.pdf';
-        const generated = await window.SigningPDF.generate({ kind, data, sigImg, lang, filename });
+        const generated = await window.SigningPDF.generate({ kind, data, sigImg, lessorSigImg, lang, filename });
         if (kind === 'delivery') {
           const emailPayload = {
             to: 'anita@djjequipment.com.au',
@@ -910,11 +952,67 @@ function makeForm(kind) {
       </div>
     );
 
+    const lessorSigSlot = kind === 'rental' ? (
+      <div>
+        <window.SigPad
+          ref={lessorSigRef}
+          height={160}
+          lang={lang}
+          label="LESSOR SIGNATURE"
+          zhLabel="出租方签字"
+          onChange={empty => { setLessorSigEmpty(empty); if (!empty) setLessorAutoSigned(false); }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, gap: 8 }}>
+          <button type="button"
+            onClick={() => {
+              lessorSigRef.current?.clear?.();
+              setLessorAutoSigned(false);
+              setLessorSigEmpty(true);
+            }}
+            style={{
+              background: 'transparent', border: '1px solid var(--rule)',
+              borderRadius: 4, padding: '6px 12px', fontSize: 12, color: 'var(--ink-2)',
+            }}>{t.clear}</button>
+          <button type="button"
+            onClick={() => {
+              const c = lessorSigRef.current;
+              if (!c) return;
+              const canvas = document.createElement('canvas');
+              canvas.width = 400; canvas.height = 160;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#fff';
+              ctx.fillRect(0, 0, 400, 160);
+              ctx.strokeStyle = '#0d1b2a';
+              ctx.lineWidth = 2;
+              ctx.font = 'italic bold 28px Georgia, serif';
+              ctx.fillStyle = '#0d1b2a';
+              ctx.fillText('DJJ Equipment', 30, 80);
+              ctx.font = '13px monospace';
+              ctx.fillStyle = '#666';
+              ctx.fillText('Authorised Signatory', 30, 108);
+              if (c.drawDataURL) {
+                c.drawDataURL(canvas.toDataURL());
+              } else {
+                window.__djjLessorAutoSigData = canvas.toDataURL();
+              }
+              setLessorSigEmpty(false);
+              setLessorAutoSigned(true);
+            }}
+            style={{
+              background: 'var(--ink)', color: '#fff',
+              border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12,
+            }}>
+            {lessorAutoSigned ? `✓ ${t.autoSigned}` : t.autoSign}
+          </button>
+        </div>
+      </div>
+    ) : null;
+
     const body = kind === 'delivery'
       ? <DeliveryBody data={data} set={set} lang={lang} sigSlot={sigSlot} />
       : kind === 'dispatch'
         ? <DispatchBody data={data} set={set} lang={lang} sigSlot={sigSlot} />
-        : <RentalBody  data={data} set={set} lang={lang} sigSlot={sigSlot} />;
+        : <RentalBody  data={data} set={set} lang={lang} sigSlot={sigSlot} lessorSigSlot={lessorSigSlot} />;
 
     const copyLink = async () => {
       const link = buildDeliveryShareUrl(data);

@@ -92,6 +92,23 @@ const SigPad = forwardRef(function SigPad({ height = 200, label = '', zhLabel = 
       onChange && onChange(true);
     },
     isEmpty() { return empty; },
+    drawDataURL(dataUrl) {
+      const img = new window.Image();
+      img.onload = () => {
+        const c = canvasRef.current;
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.restore();
+        ctx.drawImage(img, 0, 0, c.width / dpr, c.height / dpr);
+        setEmpty(false);
+        onChange && onChange(false);
+      };
+      img.src = dataUrl;
+    },
     toDataURL() {
       // Composite onto a white background for safer PDF embedding
       const c = canvasRef.current;

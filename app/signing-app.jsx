@@ -213,7 +213,7 @@ async function loadLogoDataURL() {
 }
 
 window.SigningPDF = {
-  async generate({ kind, data, sigImg, lang, filename }) {
+  async generate({ kind, data, sigImg, lessorSigImg, lang, filename }) {
     const t  = (en, zh) => lang === 'zh' ? zh : en;
     const tt = (en, zh) => lang === 'zh' ? `${zh} · ${en}` : `${en} · ${zh}`;
     const docNo = kind === 'delivery'
@@ -310,7 +310,6 @@ window.SigningPDF = {
         block(tt('Issues / Notes', '问题/备注'), data.issues),
       ].join(''));
     } else {
-      // Lessee + period
       body += section(tt('Parties', '合同方'), [
         block(tt('Lessor', '出租方'), 'DJJ Equipment Pty Ltd\nABN 56 615 358 275\n100 Derby Street, Silverwater NSW 2128'),
         row(tt('Company', '公司'), data.lessee_company),
@@ -334,25 +333,18 @@ window.SigningPDF = {
         row(tt('Billing cycle', '计费周期'), periodLabel),
       ].join(''));
 
-      // Equipment rows
       const equipments = Array.isArray(data.equipments) ? data.equipments : [{}];
       equipments.forEach((eq, idx) => {
         body += section(tt(`Equipment ${idx + 1}`, `设备 ${idx + 1}`), [
-          eq.f_desc ? row(tt('Description', '描述'), eq.f_desc) : '',
+          eq.f_desc     ? row(tt('Description', '描述'), eq.f_desc) : '',
           eq.f_category ? row(tt('Category', '类别'), eq.f_category) : '',
-          eq.f_serial ? row(tt('Serial #', '编号'), eq.f_serial) : '',
-          eq.f_vin ? row(tt('VIN', 'VIN'), eq.f_vin) : '',
-          eq.f_qty ? row(tt('Qty', '数量'), eq.f_qty) : '',
-          eq.f_weekly ? row(tt('Rate', '费率'), `AUD $${eq.f_weekly}`) : '',
-          eq.f_delcol ? row(tt('Delivery & collection', '送货/回收'), `AUD $${eq.f_delcol}`) : '',
-          eq.f_config ? block(tt('Configuration / Notes', '配置/备注'), eq.f_config) : '',
+          eq.f_vin      ? row(tt('VIN / Serial', 'VIN / 序列号'), eq.f_vin) : '',
+          eq.f_weekly   ? row(tt('Rate', '费率'), `AUD $${eq.f_weekly}`) : '',
+          eq.f_delcol   ? row(tt('Delivery & collection', '送货/回收'), `AUD $${eq.f_delcol}`) : '',
+          eq.f_config   ? block(tt('Configuration / Notes', '配置/备注'), eq.f_config) : '',
         ].join(''));
       });
 
-      // Charges
-      const machineCount = equipments.length || 1;
-      const bondPer = parseFloat(data.bond_per) || 1000;
-      const bondTotal = (machineCount * bondPer).toFixed(2);
       const intervalLabel = {
         weekly: tt('Weekly', '每周'),
         monthly: tt('Monthly', '每月'),
@@ -360,26 +352,45 @@ window.SigningPDF = {
         custom: data.ongoing_custom_label || tt('Custom', '自定义'),
       }[data.ongoing_interval] || data.ongoing_interval;
 
-      body += section(tt('Charges / Card', '费用 / 信用卡'), [
+      body += section(tt('Charges', '费用'), [
         row(tt('Initial charge', '初始费用'), data.initial ? `AUD $${data.initial}` : ''),
-        row(tt('Bond (per machine)', '保证金(每台)'), `AUD $${data.bond_per || '1,000.00'}`),
-        row(tt('Total bond', '保证金合计'), `AUD $${bondTotal} (×${machineCount})`),
+        row(tt('Bond per machine', '每台保证金'), data.bond_per ? `AUD $${data.bond_per}` : ''),
+        row(tt('Total bond', '保证金合计'), data.bond_total ? `AUD $${data.bond_total}` : ''),
         row(tt('Ongoing rate', '续租费率'), data.ongoing_rate ? `AUD $${data.ongoing_rate} ${intervalLabel}` : ''),
-        row(tt('Name on card', '持卡人'), data.card_name),
-        row(tt('Card number', '卡号'), data.card_no ? '**** **** **** ' + String(data.card_no).slice(-4) : ''),
-        row(tt('Expiry', '有效期'), data.card_exp),
       ].join(''));
 
       body += section(tt('Execution', '签署'), [
-        row(tt('Full name', '全名'), data.full_name),
+        row(tt('Full name (Lessee)', '承租方签署人'), data.full_name),
         row(tt('Position', '职位'), data.position),
+        row(tt('Full name (Lessor)', '出租方签署人'), data.lessor_name),
+        row(tt('Lessor position', '出租方职位'), data.lessor_position),
       ].join(''));
     }
 
     const title = t(kind === 'delivery' ? 'Delivery Order Sign-Off' : kind === 'dispatch' ? 'Dispatch Report' : 'Forklift Rental Agreement',
                     kind === 'delivery' ? '送货签收单' : kind === 'dispatch' ? '发货报告' : '叉车租赁协议');
-    const sigLabel = kind === 'rental' ? tt('Lessee signature', '承租方签字') : tt('Driver signature', '司机签字');
     const stamp = `${t('Signed on', '签字时间')}: ` + new Date().toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-AU');
+
+    // For rental: two-column signature block; otherwise single
+    const sigBlockHtml = kind === 'rental' ? `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;">
+    <div>
+      <div class="sec" style="border-top:none;padding-top:0;">${esc(tt('Lessee Signature', '承租方签字'))}</div>
+      <div class="sigbox">${sigImg ? `<img src="${sigImg}" alt="lessee signature"/>` : ''}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#777;margin-top:4px;">
+        ${esc(data.full_name || '')}${data.position ? ' · ' + esc(data.position) : ''}
+      </div>
+    </div>
+    <div>
+      <div class="sec" style="border-top:none;padding-top:0;">${esc(tt('Lessor Signature', '出租方签字'))}</div>
+      <div class="sigbox">${lessorSigImg ? `<img src="${lessorSigImg}" alt="lessor signature"/>` : ''}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#777;margin-top:4px;">
+        ${esc(data.lessor_name || '')}${data.lessor_position ? ' · ' + esc(data.lessor_position) : ''}
+      </div>
+    </div>
+  </div>` : `
+  <div class="sec" style="margin-top:10px;">${esc(kind === 'rental' ? tt('Lessee signature', '承租方签字') : tt('Driver signature', '司机签字'))}</div>
+  <div class="sigbox">${sigImg ? `<img src="${sigImg}" alt="signature"/>` : ''}</div>`;
 
     const html = `
 <div id="djj-pdf-page" style="
@@ -430,15 +441,14 @@ window.SigningPDF = {
     </div>
   </div>
   ${body}
-  <div class="sec" style="margin-top:10px;">${esc(sigLabel)}</div>
-  <div class="sigbox">${sigImg ? `<img src="${sigImg}" alt="signature"/>` : ''}</div>
+  ${sigBlockHtml}
   <div class="sigfoot">
     <span>${esc(stamp)}</span>
     <span>${esc(t('Document', '文件'))}: ${esc(docNo)}</span>
   </div>
 </div>`;
 
-    // Mount visible (off-canvas via overflow), so html2canvas paints real glyphs
+    // Mount off-canvas, render, and build PDF
     const host = document.createElement('div');
     Object.assign(host.style, {
       position: 'absolute', left: '-10000px', top: '0',
@@ -447,12 +457,10 @@ window.SigningPDF = {
     host.innerHTML = html;
     document.body.appendChild(host);
 
-    // Wait for embedded images (logo + signature) to load
     await Promise.all([...host.querySelectorAll('img')].map(img =>
       img.complete && img.naturalWidth ? Promise.resolve() :
       new Promise(r => { img.onload = img.onerror = () => r(); })
     ));
-    // One frame so fonts settle
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch {} }
 
@@ -463,52 +471,45 @@ window.SigningPDF = {
     });
     host.remove();
 
-    // Build a single-page A4 PDF. Scale the composed page down only if needed.
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
-    const PAGE_W = doc.internal.pageSize.getWidth();   // 595.28
-    const PAGE_H = doc.internal.pageSize.getHeight();  // 841.89
+    const PAGE_W = doc.internal.pageSize.getWidth();
+    const PAGE_H = doc.internal.pageSize.getHeight();
     const fit = Math.min(PAGE_W / canvas.width, PAGE_H / canvas.height);
     const imgW = canvas.width * fit;
     const imgH = canvas.height * fit;
-    const x = (PAGE_W - imgW) / 2;
-    const y = (PAGE_H - imgH) / 2;
-    const imgData = canvas.toDataURL('image/png');
-    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
-    const pdfDataUrl = doc.output('datauristring');
+    doc.addImage(canvas.toDataURL('image/png'), 'PNG',
+      (PAGE_W - imgW) / 2, (PAGE_H - imgH) / 2, imgW, imgH);
 
-    // Append T&C and Fair Wear & Tear PDFs for rental agreements
+    // Append T&C and Fair Wear & Tear PDFs for rental
     if (kind === 'rental') {
-      try {
-        const appendPdf = async (url) => {
+      const appendPdf = async (url) => {
+        try {
           const resp = await fetch(url);
           if (!resp.ok) return;
-          const arrayBuffer = await resp.arrayBuffer();
-          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const buf = await resp.arrayBuffer();
+          const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
           for (let p = 1; p <= pdfDoc.numPages; p++) {
             const page = await pdfDoc.getPage(p);
-            const viewport = page.getViewport({ scale: 1.5 });
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const ctx = canvas.getContext('2d');
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            const vp = page.getViewport({ scale: 1.5 });
+            const c = document.createElement('canvas');
+            c.width = vp.width; c.height = vp.height;
+            await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+            const imgD = c.toDataURL('image/jpeg', 0.85);
             doc.addPage('a4', 'portrait');
             const pw = doc.internal.pageSize.getWidth();
             const ph = doc.internal.pageSize.getHeight();
-            const scale = Math.min(pw / viewport.width, ph / viewport.height);
-            const w = viewport.width * scale;
-            const h = viewport.height * scale;
-            doc.addImage(imgData, 'JPEG', (pw - w) / 2, (ph - h) / 2, w, h);
+            const s = Math.min(pw / vp.width, ph / vp.height);
+            doc.addImage(imgD, 'JPEG', (pw - vp.width * s) / 2, (ph - vp.height * s) / 2,
+              vp.width * s, vp.height * s);
           }
-        };
-        await appendPdf('../hire-agreement.pdf');
-        await appendPdf('../fair-wear-tear.pdf');
-      } catch (e) {
-        console.warn('Could not append appendix PDFs:', e);
-      }
+        } catch (e) { console.warn('appendPdf failed:', url, e); }
+      };
+      await appendPdf('../hire-agreement.pdf');
+      await appendPdf('../fair-wear-tear.pdf');
     }
+
+    const pdfDataUrl = doc.output('datauristring');
     doc.save(fname);
 
     try {
