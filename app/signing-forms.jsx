@@ -296,26 +296,41 @@ function EquipmentRows({ rows, lang, onChange }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[
-              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc,     ph: lang === 'zh' ? '丰田8FG25平衡重式叉车' : 'Toyota 8FG25 Counterbalance Forklift' },
-              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category, ph: lang === 'zh' ? '平衡重、步行式、高位拣选等' : 'Counterbalance, Walkie Reach, High Reach, etc.' },
-              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin,      ph: 'TY-8FG25-2208' },
+              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc,     ph: lang === 'zh' ? '杭叉CPCD35-XW33C-RT4' : 'HangCha CPCD35-XW33C-RT4' },
+              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category, ph: lang === 'zh' ? '平衡重式叉车' : 'Counterbalance Forklift' },
+              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin,      ph: '19BF00032' },
               { key: 'f_weekly',   en: t.fields.f_weekly,   zh: T.zh.fields.f_weekly,   suffix: 'AUD', ph: '0.00' },
-              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true, ph: lang === 'zh' ? '全维护、液化气、2.5T等' : 'Fully maintained, LPG, 2.5T capacity, etc.' },
-            ].map(({ key, en, zh, suffix, wide, ph }) => (
+              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true, textarea: true, ph: lang === 'zh' ? '全新，4WD，越野型，集成侧移器和货叉调位器' : 'Brand new, 4WD, Rough Terrain, Integrated Side-shift and Fork-Positioner' },
+            ].map(({ key, en, zh, suffix, wide, textarea, ph }) => (
               <div key={key} style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
                 <Label en={en} zh={zh} lang={lang} />
                 <div style={{ position: 'relative' }}>
-                  <input
-                    value={row[key] || ''}
-                    onChange={e => update(idx, key, e.target.value)}
-                    placeholder={ph || (lang === 'zh' ? '请输入…' : 'Enter…')}
-                    style={{
-                      width: '100%', minHeight: 44, padding: '10px 12px',
-                      paddingRight: suffix ? 38 : 12,
-                      background: '#fff', border: '1px solid var(--rule)',
-                      borderRadius: 6, fontSize: 15, outline: 'none',
-                    }}
-                  />
+                  {textarea ? (
+                    <textarea
+                      value={row[key] || ''}
+                      onChange={e => update(idx, key, e.target.value)}
+                      placeholder={ph || (lang === 'zh' ? '请输入…' : 'Enter…')}
+                      rows={2}
+                      style={{
+                        width: '100%', padding: '10px 12px',
+                        background: '#fff', border: '1px solid var(--rule)',
+                        borderRadius: 6, fontSize: 15, outline: 'none',
+                        resize: 'vertical', fontFamily: 'inherit',
+                      }}
+                    />
+                  ) : (
+                    <input
+                      value={row[key] || ''}
+                      onChange={e => update(idx, key, e.target.value)}
+                      placeholder={ph || (lang === 'zh' ? '请输入…' : 'Enter…')}
+                      style={{
+                        width: '100%', minHeight: 44, padding: '10px 12px',
+                        paddingRight: suffix ? 38 : 12,
+                        background: '#fff', border: '1px solid var(--rule)',
+                        borderRadius: 6, fontSize: 15, outline: 'none',
+                      }}
+                    />
+                  )}
                   {suffix && (
                     <span style={{
                       position: 'absolute', right: 10, top: '50%',
