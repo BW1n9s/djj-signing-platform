@@ -63,7 +63,8 @@ app.post('/delivery/pdf-to-lark', async (c) => {
   const { open_id, pdfDataUrl, filename, data } = body;
   if (!open_id || !pdfDataUrl) return c.json({ ok: false, error: 'Missing open_id or pdfDataUrl' }, 400);
   try {
-    const base64 = pdfDataUrl.replace(/^data:application\/pdf;base64,/, '');
+    const commaIdx = pdfDataUrl.indexOf(',');
+    const base64 = commaIdx !== -1 ? pdfDataUrl.slice(commaIdx + 1) : pdfDataUrl;
     const caption = [
       '✅ 签字已完成 / Delivery order signed',
       data?.invoice_no    ? `📄 发票号 Invoice: ${data.invoice_no}`    : null,
@@ -92,7 +93,8 @@ app.post('/signed', async (c) => {
   }
 
   try {
-    const base64 = pdfDataUrl.replace(/^data:application\/pdf;base64,/, '');
+    const commaIdx = pdfDataUrl.indexOf(',');
+    const base64 = commaIdx !== -1 ? pdfDataUrl.slice(commaIdx + 1) : pdfDataUrl;
     const file_token = await uploadPDFToDrive(env, { pdfBase64: base64, filename });
     await sendSignedCard(env, { open_id, file_token, kind: kind || 'delivery', data });
     return c.json({ ok: true, file_token });
