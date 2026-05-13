@@ -16,10 +16,13 @@ export async function uploadPDFToDrive(env, { pdfBase64, filename, folderToken }
 export async function uploadFileToDrive(env, { filename, mimeType, bytes, folderToken }) {
   const token = await getTenantAccessToken(env);
 
+  // folderToken 优先；其次读环境变量；都没有则不传 parent_node（上传到 Bot 根目录）
+  const folder = folderToken || env.LARK_DRIVE_FOLDER_TOKEN || null;
+
   const form = new FormData();
   form.append('file_name', filename);
   form.append('parent_type', 'explorer');
-  if (folderToken) form.append('parent_node', folderToken);
+  if (folder) form.append('parent_node', folder);
   form.append('size', String(bytes.length));
   form.append('file', new Blob([bytes], { type: mimeType }), filename);
 
@@ -29,6 +32,6 @@ export async function uploadFileToDrive(env, { filename, mimeType, bytes, folder
     body: form,
   });
   const data = await resp.json();
-  if (data.code !== 0) throw new Error(`[Lark Drive] Upload failed: ${data.msg}`);
+  if (data.code !== 0) throw new Error(`[Lark Drive] Upload failed (${data.code}): ${data.msg}`);
   return data.data.file_token;
 }

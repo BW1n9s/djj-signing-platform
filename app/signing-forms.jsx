@@ -943,7 +943,10 @@ function makeForm(kind) {
               ? 'PDF 已保存至飞书云盘 ✓'
               : 'PDF saved to Lark Drive ✓');
           } catch (e) {
-            console.warn('[Lark /signed]', e);
+            console.error('[Lark /signed] failed:', e);
+            setNote(lang === 'zh'
+              ? `⚠️ PDF 本地已保存，飞书云盘上传失败：${e.message}`
+              : `⚠️ PDF saved locally. Lark Drive upload failed: ${e.message}`);
           }
         }
         // ────────────────────────────────────────────────────
