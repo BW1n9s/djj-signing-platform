@@ -296,11 +296,11 @@ function EquipmentRows({ rows, lang, onChange }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[
-              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc,     ph: lang === 'zh' ? '例：丰田8FG25平衡重式叉车' : 'e.g. Toyota 8FG25 Counterbalance Forklift' },
-              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category, ph: lang === 'zh' ? '例：平衡重 / 步行式 / 高位拣选' : 'e.g. Counterbalance / Walkie Reach / High Reach' },
-              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin,      ph: 'e.g. TY-8FG25-2208' },
+              { key: 'f_desc',     en: t.fields.f_desc,     zh: T.zh.fields.f_desc,     ph: lang === 'zh' ? '丰田8FG25平衡重式叉车' : 'Toyota 8FG25 Counterbalance Forklift' },
+              { key: 'f_category', en: t.fields.f_category, zh: T.zh.fields.f_category, ph: lang === 'zh' ? '平衡重、步行式、高位拣选等' : 'Counterbalance, Walkie Reach, High Reach, etc.' },
+              { key: 'f_vin',      en: t.fields.f_vin,      zh: T.zh.fields.f_vin,      ph: 'TY-8FG25-2208' },
               { key: 'f_weekly',   en: t.fields.f_weekly,   zh: T.zh.fields.f_weekly,   suffix: 'AUD', ph: '0.00' },
-              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true, ph: lang === 'zh' ? '例：全维护，液化气，2.5T' : 'e.g. Fully maintained, LPG, 2.5T capacity' },
+              { key: 'f_config',   en: t.fields.f_config,   zh: T.zh.fields.f_config,   wide: true, ph: lang === 'zh' ? '全维护、液化气、2.5T等' : 'Fully maintained, LPG, 2.5T capacity, etc.' },
             ].map(({ key, en, zh, suffix, wide, ph }) => (
               <div key={key} style={{ gridColumn: wide ? '1 / -1' : 'auto' }}>
                 <Label en={en} zh={zh} lang={lang} />
@@ -497,6 +497,7 @@ const DEFAULT_RENTAL = {
   start: '',
   end: '',
   period_type: 'weekly',
+  period_custom_label: '',
   equipments: [
     { f_desc: '', f_category: '', f_vin: '', f_weekly: '', f_config: '' }
   ],
@@ -694,22 +695,30 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
 
       <SectionHead>{t.section.lessee}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('lessee_company', { placeholder: lang === 'zh' ? '例：澳佳物流有限公司' : 'e.g. Acme Logistics Pty Ltd' })}
-        {F('lessee_abn',     { placeholder: 'e.g. 12 345 678 901' })}
-        {F('contact_name',  { placeholder: lang === 'zh' ? '例：张三' : 'e.g. John Smith' })}
-        {F('contact_phone', { placeholder: 'e.g. +61 400 123 456' })}
-        {F('contact_email', { wide: true, placeholder: 'e.g. contact@company.com.au' })}
-        {F('delivery',      { wide: true, placeholder: lang === 'zh' ? '例：22 Industrial Dr, Wetherill Park NSW 2164' : 'e.g. 22 Industrial Dr, Wetherill Park NSW 2164' })}
+        {F('lessee_company', { placeholder: lang === 'zh' ? '澳佳物流有限公司' : 'Acme Logistics Pty Ltd' })}
+        {F('lessee_abn',     { placeholder: '12 345 678 901' })}
+        {F('contact_name',  { placeholder: lang === 'zh' ? '张三' : 'John Smith' })}
+        {F('contact_phone', { placeholder: '+61 400 123 456' })}
+        {F('contact_email', { wide: true, placeholder: 'contact@company.com.au' })}
+        {F('delivery',      { wide: true, placeholder: lang === 'zh' ? '22 Industrial Dr, Wetherill Park NSW 2164' : '22 Industrial Dr, Wetherill Park NSW 2164' })}
       </div>
 
       <SectionHead>{t.section.period}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('start', { placeholder: 'e.g. 12 May 2026' })}
-        {F('end',   { placeholder: 'e.g. 11 Aug 2026' })}
+        {F('start', { placeholder: '12 May 2026' })}
+        {F('end',   { placeholder: '11 Aug 2026' })}
         <SelectField
           name="period_type" labelEn={t.fields.period_type} labelZh={T.zh.fields.period_type}
           options={periodOptions} value={data.period_type} onChg={set}
         />
+        {data.period_type === 'custom' && (
+          <Field name="period_custom_label"
+            en="Cycle details" zh="周期说明"
+            lang={lang} value={data.period_custom_label} onChange={set}
+            placeholder={lang === 'zh' ? '说明计费周期安排…' : 'Describe the billing cycle arrangement…'}
+            wide
+          />
+        )}
       </div>
 
       <SectionHead>{t.section.equipment}</SectionHead>
@@ -826,8 +835,8 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
 
       <SectionHead>{t.section.exec}</SectionHead>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        {F('full_name', { placeholder: lang === 'zh' ? '例：张三' : 'e.g. John Smith' })}
-        {F('position',  { placeholder: lang === 'zh' ? '例：运营经理' : 'e.g. Operations Manager' })}
+        {F('full_name', { placeholder: lang === 'zh' ? '张三' : 'John Smith' })}
+        {F('position',  { placeholder: lang === 'zh' ? '运营经理' : 'Operations Manager' })}
       </div>
 
       {/* Dual signature block */}
@@ -851,7 +860,7 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
-        {F('lessor_name',     { placeholder: 'e.g. Daniel Wu' })}
+        {F('lessor_name',     { placeholder: 'Daniel Wu' })}
         {F('lessor_position', { placeholder: 'Sales Representative' })}
       </div>
     </div>
