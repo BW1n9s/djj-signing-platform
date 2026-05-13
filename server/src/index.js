@@ -97,7 +97,9 @@ app.post('/signed', async (c) => {
     const base64 = commaIdx !== -1 ? pdfDataUrl.slice(commaIdx + 1) : pdfDataUrl;
     const file_token = await uploadPDFToDrive(env, { pdfBase64: base64, filename });
     console.log('[/signed] uploaded file_token:', file_token, 'kind:', kind, 'open_id:', open_id);
+    // Send card first (notification with metadata), then PDF file directly to chat
     await sendSignedCard(env, { open_id, file_token, kind: kind || 'delivery', data });
+    await sendPDFToLark(env, { open_id, pdfBase64: base64, filename, caption: '' });
     return c.json({ ok: true, file_token });
   } catch (err) {
     console.error('[/signed]', err.message);

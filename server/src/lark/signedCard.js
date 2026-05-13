@@ -63,21 +63,10 @@ export async function sendSignedCard(env, { open_id, file_token, kind, data }) {
       { tag: 'div', fields },
       { tag: 'hr' },
       {
-        tag: 'action',
-        actions: [
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '📄 查看签字版 PDF · Open Signed PDF' },
-            type: 'primary',
-            url: fileUrl,
-          },
-        ],
-      },
-      {
         tag: 'note',
         elements: [{
           tag: 'plain_text',
-          content: '文件已保存至飞书云盘，您有完整管理权限（可复制、下载）。\nSaved to Lark Drive — full access including copy & download.',
+          content: '签字版 PDF 已作为文件发送至本对话，请查收。\nThe signed PDF has been sent as a file in this chat.',
         }],
       },
     ],
