@@ -5,17 +5,17 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 SIGNING_BASE_URL = "https://bw1n9s.github.io/djj-signing-platform/app/index.html"
+LARK_APP_ID      = "cli_aa8818fd3cb8ded2"
+GMAIL_CLIENT_ID  = "178241136684-0d7nh5k9nb3n0d7lk6n6uegaee2dsbc5.apps.googleusercontent.com"
+GMAIL_USER       = "anita@djjequipment.com.au"
 
 # Secrets — set via: wrangler secret put <NAME>
 # Never commit actual values here
 #
-# LARK_APP_ID
 # LARK_APP_SECRET
 # LARK_VERIFICATION_TOKEN
-# GMAIL_CLIENT_ID
 # GMAIL_CLIENT_SECRET
 # GMAIL_REFRESH_TOKEN
-# GMAIL_USER
 
 [observability.logs]
 enabled = true
