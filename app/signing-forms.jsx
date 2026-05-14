@@ -524,6 +524,10 @@ const DEFAULT_RENTAL = {
   ongoing_custom_label: '',
   ongoing_rate: '',
   initial: '',
+  card_name: '',
+  card_no: '',
+  card_exp: '',
+  card_ccv: '',
   full_name: '',
   position: '',
   lessor_name: '',
@@ -846,6 +850,14 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
             lang={lang} value={data.ongoing_custom_label} onChange={set} wide
           />
         )}
+      </div>
+
+      <SectionHead>{t.section.card}</SectionHead>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        {F('card_name', { wide: true, placeholder: 'John Smith' })}
+        {F('card_no',   { placeholder: '•••• •••• •••• ••••' })}
+        {F('card_exp',  { placeholder: 'MM / YY' })}
+        {F('card_ccv',  { placeholder: '•••' })}
       </div>
 
       <SectionHead>{t.section.exec}</SectionHead>
