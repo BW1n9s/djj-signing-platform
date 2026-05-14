@@ -44,7 +44,7 @@ const T = {
       ongoing_rate: 'Rate per interval',
       card_name: 'Name on card', card_no: 'Card number', card_exp: 'Expiry', card_ccv: 'CCV',
       full_name: 'Full name', position: 'Position',
-      lessor_name: 'Lessor name',
+      lessor_name: 'Sales Representative',
       lessor_position: 'Lessor position',
     },
     addEquipment: '+ Add equipment',
@@ -111,7 +111,7 @@ const T = {
       ongoing_rate: '每期租金',
       card_name: '持卡人', card_no: '卡号', card_exp: '有效期', card_ccv: 'CCV',
       full_name: '全名', position: '职位',
-      lessor_name: '出租方签署人',
+      lessor_name: '销售代表',
       lessor_position: '职位',
     },
     addEquipment: '+ 添加设备',
@@ -875,8 +875,7 @@ function RentalBody({ data, set, lang, sigSlot, lessorSigSlot }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 8 }}>
-        {F('lessor_name',     { placeholder: 'Daniel Wu' })}
-        {F('lessor_position', { placeholder: 'Sales Representative' })}
+        {F('lessor_name', { placeholder: lang === 'zh' ? '销售代表姓名' : 'Sales rep name' })}
       </div>
     </div>
   );
@@ -954,6 +953,9 @@ function makeForm(kind) {
               setUserSig({ name: j.name, dataUrl: j.dataUrl });
               setSigPending(false);
               if (poll) { clearInterval(poll); poll = null; }
+              if (kind === 'rental') {
+                setData(d => ({ ...d, lessor_name: j.name }));
+              }
             }
           })
           .catch(() => {});
